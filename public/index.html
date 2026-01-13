@@ -1,9 +1,15 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','GTM-PJJTL8QX');</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>匿名聊天室Chat With Stranger</title>
+    <title>匿名聊天室 Chat With Stranger</title>
+    
     <style>
         /* Pantone 色卡應用 */
         :root {
@@ -45,15 +51,15 @@
         }
 
         .msg { 
-    max-width: 75%; 
-    padding: 12px 16px; 
-    border-radius: 25px; /* 更有質感的圓角 */
-    box-shadow: 0 4px 15px rgba(0,0,0,0.15); /* 增加柔和陰影 */
-    font-size: 15px; 
-    line-height: 1.4; 
-    word-wrap: break-word; 
-    margin-bottom: 5px; /* 讓對話框之間有一點點呼吸空間 */
-}
+            max-width: 75%; 
+            padding: 12px 16px; 
+            border-radius: 25px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15); 
+            font-size: 15px; 
+            line-height: 1.4; 
+            word-wrap: break-word; 
+            margin-bottom: 5px; 
+        }
         .msg.me { 
             align-self: flex-end; 
             background: var(--my-msg); 
@@ -108,7 +114,6 @@
         }
         button:disabled { background: #555; cursor: not-allowed; }
 
-        /* 免責聲明彈窗樣式 */
         #disclaimer-modal {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.85); display: flex; 
@@ -121,6 +126,8 @@
     </style>
 </head>
 <body>
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-PJJTL8QX"
+    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 
     <div id="disclaimer-modal">
         <div class="modal-content">
@@ -135,7 +142,7 @@
         </div>
     </div>
 
-    <header>匿名聊天室Chat With Stranger</header>
+    <header>匿名聊天室 Chat With Stranger</header>
     <div id="chat-box">
         <div class="system">請先閱讀並同意免責聲明</div>
     </div>
@@ -152,10 +159,8 @@
         const msgInput = document.getElementById('msg');
         const mainBtn = document.getElementById('btn');
 
-        // 當使用者點擊「同意」
         function agreeDisclaimer() {
             document.getElementById('disclaimer-modal').style.display = 'none';
-            // 如果連線已建立，直接搜；若沒連上，等連上再搜
             if (socket.connected) {
                 startSearch();
             } else {
@@ -177,7 +182,7 @@
             socket.emit('start_chat');
             mainBtn.innerText = '搜尋中';
             mainBtn.disabled = true;
-            chatBox.innerHTML = ''; // 清空提示
+            chatBox.innerHTML = ''; 
             addSystemMsg('正在為您自動搜尋聊天對象...');
         }
 
