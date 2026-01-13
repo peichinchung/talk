@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>質感匿名聊天室</title>
     <style>
-        /* 應用你的 Pantone 色卡 */
+        /* Pantone 色卡應用 */
         :root {
             --bg-color: #6a6461;       /* Hematite 17-5800 */
             --header-color: #8c8485;   /* Cloud Cover 16-1523 */
@@ -22,8 +22,8 @@
             background: var(--bg-color); 
             height: 100vh; 
             display: flex; 
-            flex-direction: column;
-            color: var(--text-white);
+            flex-direction: column; 
+            color: var(--text-white); 
         }
 
         header { 
@@ -31,8 +31,8 @@
             padding: 15px; 
             text-align: center; 
             font-weight: bold; 
-            border-bottom: 1px solid rgba(0,0,0,0.1);
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            border-bottom: 1px solid rgba(0,0,0,0.1); 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2); 
         }
 
         #chat-box { 
@@ -43,14 +43,13 @@
             flex-direction: column; 
             gap: 12px; 
         }
-        
-        /* 對話氣泡 */
+
         .msg { 
             max-width: 75%; 
             padding: 12px 16px; 
             border-radius: 20px; 
             font-size: 15px; 
-            line-height: 1.4;
+            line-height: 1.4; 
             word-wrap: break-word; 
         }
         .msg.me { 
@@ -79,7 +78,7 @@
             background: var(--header-color); 
             padding: 12px; 
             display: flex; 
-            border-top: 1px solid rgba(0,0,0,0.1);
+            border-top: 1px solid rgba(0,0,0,0.1); 
             padding-bottom: calc(12px + env(safe-area-inset-bottom)); 
         }
         
@@ -91,7 +90,7 @@
             border-radius: 25px; 
             outline: none; 
             font-size: 16px; 
-            color: white;
+            color: white; 
         }
         input::placeholder { color: rgba(255,255,255,0.6); }
 
@@ -101,23 +100,46 @@
             color: white; 
             font-weight: bold; 
             padding: 0 20px; 
-            margin-left: 10px;
-            border-radius: 25px;
+            margin-left: 10px; 
+            border-radius: 25px; 
             cursor: pointer; 
-            transition: opacity 0.2s;
         }
         button:disabled { background: #555; cursor: not-allowed; }
-        button:active { opacity: 0.8; }
+
+        /* 免責聲明彈窗樣式 */
+        #disclaimer-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); display: flex; 
+            justify-content: center; align-items: center; z-index: 9999;
+        }
+        .modal-content {
+            background: white; color: #333; padding: 25px; 
+            border-radius: 15px; width: 85%; max-width: 400px; text-align: center;
+        }
     </style>
 </head>
 <body>
+
+    <div id="disclaimer-modal">
+        <div class="modal-content">
+            <h3 style="color:var(--accent-color); margin-top:0;">使用須知與免責聲明</h3>
+            <p style="font-size:14px; text-align:left; line-height:1.6; color:#666;">
+                1. 本平台僅供社交娛樂用途，開發者不對用戶言論負責。<br>
+                2. 嚴禁色情、騷擾、詐騙或任何非法行為。<br>
+                3. 系統不儲存對話內容，請自行保護個人隱私。<br>
+                4. 點擊同意即代表您已成年並願意遵守上述規範。
+            </p>
+            <button onclick="agreeDisclaimer()" style="background:var(--accent-color); color:white; border:none; padding:12px; border-radius:25px; font-weight:bold; cursor:pointer; width:100%; margin-top:10px;">我同意並進入</button>
+        </div>
+    </div>
+
     <header>質感匿名聊天室</header>
     <div id="chat-box">
-        <div class="system">點擊「開始」尋找聊天對象</div>
+        <div class="system">請先閱讀並同意免責聲明</div>
     </div>
     <div id="input-area">
         <input id="msg" placeholder="請先配對..." disabled>
-        <button id="btn" onclick="handleAction()">開始</button>
+        <button id="btn" onclick="handleAction()" disabled>開始</button>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
@@ -127,6 +149,19 @@
         const chatBox = document.getElementById('chat-box');
         const msgInput = document.getElementById('msg');
         const mainBtn = document.getElementById('btn');
+
+        // 當使用者點擊「同意」
+        function agreeDisclaimer() {
+            document.getElementById('disclaimer-modal').style.display = 'none';
+            // 如果連線已建立，直接搜；若沒連上，等連上再搜
+            if (socket.connected) {
+                startSearch();
+            } else {
+                socket.on('connect', () => {
+                    startSearch();
+                });
+            }
+        }
 
         function handleAction() {
             if (!currentRoom) {
@@ -140,7 +175,8 @@
             socket.emit('start_chat');
             mainBtn.innerText = '搜尋中';
             mainBtn.disabled = true;
-            addSystemMsg('正在為您搜尋聊天對象...');
+            chatBox.innerHTML = ''; // 清空提示
+            addSystemMsg('正在為您自動搜尋聊天對象...');
         }
 
         socket.on('matched', (data) => {
@@ -168,7 +204,7 @@
             currentRoom = null;
             msgInput.disabled = true;
             msgInput.value = "";
-            msgInput.placeholder = "請重新配對...";
+            msgInput.placeholder = "點擊「開始」重新配對";
             mainBtn.innerText = '開始';
             mainBtn.disabled = false;
         });
