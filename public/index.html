@@ -33,12 +33,14 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
+        // 強制使用 websocket 模式，避免雲端伺服器長連線失敗
         const socket = io({ transports: ['websocket'] });
         let currentRoom = null;
         const chatBox = document.getElementById('chat-box');
         const msgInput = document.getElementById('msg');
         const mainBtn = document.getElementById('btn');
 
+        // 主邏輯判斷：現在是要配對還是要傳訊息？
         function handleAction() {
             if (!currentRoom) {
                 startSearch();
@@ -51,13 +53,13 @@
             socket.emit('start_chat');
             mainBtn.innerText = '搜尋中';
             mainBtn.disabled = true;
-            addSystemMsg('正在為您搜尋聊天對象...');
+            addSystemMsg('正在搜尋對象...');
         }
 
         socket.on('matched', (data) => {
             currentRoom = data.roomId;
             chatBox.innerHTML = ''; 
-            addSystemMsg('配對成功！盡情聊聊吧');
+            addSystemMsg('配對成功！現在可以開始聊天了。');
             msgInput.disabled = false;
             msgInput.placeholder = "輸入訊息...";
             mainBtn.innerText = '傳送';
@@ -74,13 +76,16 @@
 
         socket.on('receive_msg', (text) => addMsg(text, 'partner'));
 
+        // 重要修正：處理對方離開
         socket.on('partner_left', () => {
             addSystemMsg('對方已離開。');
-            currentRoom = null;
+            currentRoom = null; // 清除房間 ID
             msgInput.disabled = true;
+            msgInput.value = "";
             msgInput.placeholder = "請重新配對...";
             mainBtn.innerText = '開始';
-            mainBtn.onclick = handleAction;
+            mainBtn.disabled = false;
+            // 確保按鈕恢復為搜尋功能
         });
 
         function addMsg(text, type) {
@@ -99,9 +104,9 @@
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        // 支援 Enter 鍵傳送
+        // 支援鍵盤 Enter 鍵
         msgInput.addEventListener("keypress", (e) => {
-            if (e.key === "Enter") handleAction();
+            if (e.key === "Enter" && !msgInput.disabled) handleAction();
         });
     </script>
 </body>
