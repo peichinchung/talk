@@ -37,7 +37,8 @@
         
         /* Topic Suggestion Style */
         .suggestion-container { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 10px 0; }
-        .topic-btn { background: var(--accent-color); color: white; border: none; padding: 8px 15px; border-radius: 15px; font-size: 13px; cursor: pointer; }
+        .topic-btn { background: var(--accent-color); color: white; border: none; padding: 8px 15px; border-radius: 15px; font-size: 13px; cursor: pointer; transition: 0.2s; }
+        .topic-btn:hover { opacity: 0.8; transform: scale(1.05); }
 
         #typing-status { font-size: 12px; color: #d1d1d1; padding: 5px 20px; height: 20px; font-style: italic; background: rgba(0,0,0,0.05); }
 
@@ -50,9 +51,27 @@
         .read-status { font-size: 10px; color: #ccc; margin-top: 2px; height: 12px; }
         .system { align-self: center; font-size: 12px; color: #d1d1d1; background: rgba(0,0,0,0.2); padding: 6px 14px; border-radius: 12px; text-align: center; }
 
+        /* End Button */
+        #end-btn {
+            background: rgba(220, 60, 60, 0.9);
+            border: none;
+            color: white;
+            font-weight: bold;
+            padding: 0 15px;
+            margin-right: 10px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: 0.2s;
+        }
+        #end-btn:hover {
+            background: rgba(200, 40, 40, 1);
+        }
+
         #input-area { background: var(--header-color); padding: 12px; display: flex; padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
         input { flex: 1; border: none; background: rgba(255,255,255,0.15); padding: 12px 18px; border-radius: 25px; color: white; outline: none; font-size: 16px; }
         button#btn { background: var(--accent-color); border: none; color: white; font-weight: bold; padding: 0 20px; margin-left: 10px; border-radius: 25px; cursor: pointer; }
+        button#btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
         @media (max-width: 768px) {
             #sidebar { position: absolute; left: -260px; height: 100%; }
@@ -96,6 +115,7 @@
         <div id="typing-status"></div>
         
         <div id="input-area">
+            <button id="end-btn" onclick="endChat()" style="display:none;">離開</button>
             <input id="msg" placeholder="搵到人先可以傾計..." disabled autocomplete="off">
             <button id="btn" onclick="handleAction()" disabled>開始</button>
         </div>
@@ -105,13 +125,20 @@
     <script>
         const socket = io();
         let currentRoom = null;
+        let typingTimeout = null;
         const chatBox = document.getElementById('chat-box');
         const msgInput = document.getElementById('msg');
         const mainBtn = document.getElementById('btn');
         const typingStatus = document.getElementById('typing-status');
 
-        function toggleSidebar(e) { e.stopPropagation(); document.getElementById('sidebar').classList.toggle('open'); }
-        function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); }
+        function toggleSidebar(e) { 
+            e.stopPropagation(); 
+            document.getElementById('sidebar').classList.toggle('open'); 
+        }
+        
+        function closeSidebar() { 
+            document.getElementById('sidebar').classList.remove('open'); 
+        }
 
         function agreeDisclaimer() {
             document.getElementById('disclaimer-modal').style.display = 'none';
@@ -129,16 +156,31 @@
             mainBtn.innerText = '搵緊人';
             mainBtn.disabled = true;
             chatBox.innerHTML = ''; 
+            removeEndChatButton();
             addSystemMsg('等陣哈，幫你搵緊人同你傾計...');
         }
+
+        socket.on('waiting', (data) => {
+            addSystemMsg(data.msg);
+        });
+
+        socket.on('queue_timeout', (data) => {
+            addSystemMsg(`${data.msg}（等候: ${data.waitingCount} 人）`);
+        });
+
+        socket.on('error', (data) => {
+            addSystemMsg(`⚠️ ${data.msg}`);
+            if (data.msg.includes('已經在聊天中')) {
+                showEndChatButton();
+            }
+        });
 
         socket.on('matched', (data) => {
             currentRoom = data.roomId;
             chatBox.innerHTML = ''; 
             addSystemMsg('搵到人喇！開口傾下計啦 💬');
             
-            // 渲染時事話題建議
-            if (data.topics) {
+            if (data.topics && data.topics.length > 0) {
                 const container = document.createElement('div');
                 container.className = 'suggestion-container';
                 data.topics.forEach(t => {
@@ -147,16 +189,21 @@
                     b.innerText = t;
                     b.onclick = () => {
                         msgInput.value = t;
+                        msgInput.focus();
                         sendMsg();
                         container.remove();
                     };
                     container.appendChild(b);
                 });
                 chatBox.appendChild(container);
+                chatBox.scrollTop = chatBox.scrollHeight;
             }
+
+            showEndChatButton();
 
             msgInput.disabled = false;
             msgInput.placeholder = "輸入訊息...";
+            msgInput.focus();
             mainBtn.innerText = '傳送';
             mainBtn.disabled = false;
         });
@@ -164,16 +211,33 @@
         function sendMsg() {
             const text = msgInput.value.trim();
             if(!text || !currentRoom) return;
+            
+            if (text.length > 1000) {
+                addSystemMsg('⚠️ 訊息太長（最多1000字）');
+                return;
+            }
+            
             socket.emit('send_msg', { roomId: currentRoom, msg: text });
             addMsg(text, 'me');
             msgInput.value = '';
             socket.emit('stop_typing', { roomId: currentRoom });
         }
 
-        msgInput.addEventListener('input', () => { if (currentRoom) socket.emit('typing', { roomId: currentRoom }); });
+        msgInput.addEventListener('input', () => { 
+            if (currentRoom) {
+                socket.emit('typing', { roomId: currentRoom });
+                
+                if (typingTimeout) clearTimeout(typingTimeout);
+                
+                typingTimeout = setTimeout(() => {
+                    socket.emit('stop_typing', { roomId: currentRoom });
+                }, 2000);
+            }
+        });
 
-        socket.on('receive_msg', (text) => {
+        socket.on('receive_msg', (data) => {
             typingStatus.innerText = '';
+            const text = typeof data === 'string' ? data : data.msg;
             addMsg(text, 'partner');
             socket.emit('msg_read', { roomId: currentRoom });
         });
@@ -183,22 +247,63 @@
             if (lastMyMsg) lastMyMsg.innerText = '已讀';
         });
 
-        socket.on('partner_typing', () => { typingStatus.innerText = '對方諗緊點覆你...'; });
-        socket.on('partner_stop_typing', () => { typingStatus.innerText = ''; });
+        socket.on('partner_typing', () => { 
+            typingStatus.innerText = '對方諗緊點覆你...'; 
+        });
+        
+        socket.on('partner_stop_typing', () => { 
+            typingStatus.innerText = ''; 
+        });
 
-        socket.on('partner_left', () => {
-            addSystemMsg('對方走咗喇。');
+        socket.on('partner_left', (data) => {
+            addSystemMsg(data.msg || '對方走咗喇。');
+            resetToIdle();
+        });
+
+        socket.on('chat_ended', (data) => {
+            addSystemMsg(data.msg || '對話已結束');
+            resetToIdle();
+        });
+
+        function resetToIdle() {
             currentRoom = null;
             msgInput.disabled = true;
             msgInput.placeholder = "搵到人先可以傾計...";
+            msgInput.value = '';
             mainBtn.innerText = '開始';
+            mainBtn.disabled = false;
             typingStatus.innerText = '';
-        });
+            removeEndChatButton();
+        }
+
+        // ✅ 修正：操作正確的按鈕
+        function showEndChatButton() {
+            const endBtn = document.getElementById('end-btn');
+            if (endBtn) endBtn.style.display = 'block';
+        }
+
+        function removeEndChatButton() {
+            const endBtn = document.getElementById('end-btn');
+            if (endBtn) endBtn.style.display = 'none';
+        }
+
+        function endChat() {
+            if (!currentRoom) return;
+            if (confirm('確定要離開對話？')) {
+                socket.emit('end_chat');
+                addSystemMsg('你已離開對話');
+                resetToIdle();
+            }
+        }
 
         function addMsg(text, type) {
             const wrapper = document.createElement('div');
             wrapper.className = `msg-wrapper ${type === 'me' ? 'me-wrapper' : ''} ${type}`;
-            wrapper.innerHTML = `<div class="msg ${type}">${text}</div>` + (type === 'me' ? '<div class="read-status"></div>' : '');
+            
+            const safeText = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            
+            wrapper.innerHTML = `<div class="msg ${type}">${safeText}</div>` + 
+                               (type === 'me' ? '<div class="read-status"></div>' : '');
             chatBox.appendChild(wrapper);
             chatBox.scrollTop = chatBox.scrollHeight;
         }
@@ -211,7 +316,23 @@
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        msgInput.addEventListener("keypress", (e) => { if (e.key === "Enter" && !msgInput.disabled) handleAction(); });
+        msgInput.addEventListener("keypress", (e) => { 
+            if (e.key === "Enter" && !msgInput.disabled) {
+                handleAction(); 
+            }
+        });
+
+        socket.on('disconnect', () => {
+            addSystemMsg('⚠️ 連線中斷，嘗試重新連線...');
+            mainBtn.disabled = true;
+        });
+
+        socket.on('connect', () => {
+            if (currentRoom) {
+                addSystemMsg('✅ 已重新連線，但對話已中斷，請重新開始');
+                resetToIdle();
+            }
+        });
     </script>
 </body>
 </html>
