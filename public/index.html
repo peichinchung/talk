@@ -1,182 +1,126 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-    <meta name="google-site-verification" content="z5RU-QSMZDzgizVPGN2p13VQBbRY101_ygIYfywFR2w" />    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-    })(window,document,'script','dataLayer','GTM-PJJTL8QX');</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>暖港野 HA TALK</title>
-    <meta name="description" content="厭倦ＡＩ- 無需註冊，即時配對，找回純粹的聊天體驗。">
     
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-03QD2SY1QM"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-03QD2SY1QM');
+    </script>
+
     <style>
-        /* Pantone 色卡應用 */
         :root {
-            --bg-color: #6a6461;       /* Hematite 17-5800 */
-            --header-color: #8c8485;   /* Cloud Cover 16-1523 */
-            --my-msg: #4e6579;         /* Blue Fusion 18-4218 */
-            --partner-msg: #8c8485;    /* Cloud Cover 16-1523 */
-            --accent-color: #a08bab;    /* Quiet Violet 16-3610 */
-            --text-white: #ffffff;
-            --system-bg: rgba(0, 0, 0, 0.2);
+            --bg-color: #6a6461; --header-color: #8c8485;
+            --my-msg: #4e6579; --partner-msg: #8c8485;
+            --accent-color: #a08bab; --text-white: #ffffff;
+            --sidebar-bg: #4a4542;
         }
-
-        body { 
-            font-family: -apple-system, sans-serif; 
-            margin: 0; 
-            background: var(--bg-color); 
-            height: 100vh; 
-            display: flex; 
-            flex-direction: column; 
-            color: var(--text-white); 
-        }
-
-        header { 
-            background: var(--header-color); 
-            padding: 15px; 
-            text-align: center; 
-            font-weight: bold; 
-            border-bottom: 1px solid rgba(0,0,0,0.1); 
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2); 
-        }
-
-        #chat-box { 
-            flex: 1; 
-            overflow-y: auto; 
-            padding: 20px; 
-            display: flex; 
-            flex-direction: column; 
-            gap: 12px; 
-        }
-
-        .msg { 
-            max-width: 75%; 
-            padding: 12px 16px; 
-            border-radius: 25px; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.15); 
-            font-size: 15px; 
-            line-height: 1.4; 
-            word-wrap: break-word; 
-            margin-bottom: 5px; 
-        }
-        .msg.me { 
-            align-self: flex-end; 
-            background: var(--my-msg); 
-            color: white; 
-            border-bottom-right-radius: 4px; 
-        }
-        .msg.partner { 
-            align-self: flex-start; 
-            background: var(--partner-msg); 
-            color: white; 
-            border-bottom-left-radius: 4px; 
-        }
-        .system { 
-            align-self: center; 
-            font-size: 12px; 
-            color: #d1d1d1; 
-            background: var(--system-bg); 
-            padding: 6px 14px; 
-            border-radius: 12px; 
-            text-align: center; 
-        }
-
-        #input-area { 
-            background: var(--header-color); 
-            padding: 12px; 
-            display: flex; 
-            border-top: 1px solid rgba(0,0,0,0.1); 
-            padding-bottom: calc(12px + env(safe-area-inset-bottom)); 
-        }
+        body { font-family: -apple-system, sans-serif; margin: 0; background: var(--bg-color); height: 100vh; display: flex; color: var(--text-white); overflow: hidden; }
         
-        input { 
-            flex: 1; 
-            border: none; 
-            background: rgba(255,255,255,0.15); 
-            padding: 12px 18px; 
-            border-radius: 25px; 
-            outline: none; 
-            font-size: 16px; 
-            color: white; 
-        }
-        input::placeholder { color: rgba(255,255,255,0.6); }
+        /* Side Bar Style */
+        #sidebar { width: 260px; background: var(--sidebar-bg); border-right: 1px solid rgba(0,0,0,0.2); display: flex; flex-direction: column; transition: transform 0.3s ease; }
+        .sidebar-header { padding: 20px; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 18px; }
+        .sidebar-menu { flex: 1; padding: 10px; }
+        .menu-item { padding: 12px 15px; border-radius: 8px; margin-bottom: 5px; cursor: pointer; transition: 0.2s; color: #ddd; text-decoration: none; display: block; }
+        .menu-item:hover { background: rgba(255,255,255,0.1); color: white; }
+        .menu-item.active { background: var(--accent-color); color: white; }
 
-        button { 
-            background: var(--accent-color); 
-            border: none; 
-            color: white; 
-            font-weight: bold; 
-            padding: 0 20px; 
-            margin-left: 10px; 
-            border-radius: 25px; 
-            cursor: pointer; 
-        }
-        button:disabled { background: #555; cursor: not-allowed; }
+        /* Main Chat Area */
+        #main-container { flex: 1; display: flex; flex-direction: column; position: relative; }
+        header { background: var(--header-color); padding: 15px; text-align: center; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2); display: flex; justify-content: space-between; align-items: center; }
+        
+        #typing-status { font-size: 12px; color: #d1d1d1; padding: 5px 20px; height: 18px; font-style: italic; background: rgba(0,0,0,0.1); }
+        #chat-box { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+        
+        /* Message Bubbles */
+        .msg-wrapper { display: flex; flex-direction: column; max-width: 75%; }
+        .msg-wrapper.me { align-self: flex-end; align-items: flex-end; }
+        .msg-wrapper.partner { align-self: flex-start; }
+        
+        .msg { padding: 12px 16px; border-radius: 20px; font-size: 15px; line-height: 1.4; word-wrap: break-word; position: relative; }
+        .msg.me { background: var(--my-msg); border-bottom-right-radius: 4px; }
+        .msg.partner { background: var(--partner-msg); border-bottom-left-radius: 4px; }
+        
+        .read-status { font-size: 10px; color: #ccc; margin-top: 2px; }
+        .system { align-self: center; font-size: 12px; color: #d1d1d1; background: rgba(0,0,0,0.2); padding: 6px 14px; border-radius: 12px; }
 
-        #disclaimer-modal {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85); display: flex; 
-            justify-content: center; align-items: center; z-index: 9999;
+        #input-area { background: var(--header-color); padding: 12px; display: flex; border-top: 1px solid rgba(0,0,0,0.1); padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+        input { flex: 1; border: none; background: rgba(255,255,255,0.15); padding: 12px 18px; border-radius: 25px; color: white; outline: none; }
+        button { background: var(--accent-color); border: none; color: white; font-weight: bold; padding: 0 20px; margin-left: 10px; border-radius: 25px; cursor: pointer; }
+        
+        /* Mobile adjustment */
+        @media (max-width: 768px) {
+            #sidebar { position: absolute; left: -260px; height: 100%; z-index: 100; }
+            #sidebar.open { transform: translateX(260px); }
         }
-        .modal-content {
-            background: white; color: #333; padding: 25px; 
-            border-radius: 15px; width: 85%; max-width: 400px; text-align: center;
-        }
+
+        #disclaimer-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; justify-content: center; align-items: center; z-index: 9999; }
+        .modal-content { background: white; color: #333; padding: 25px; border-radius: 15px; width: 85%; max-width: 400px; text-align: center; }
     </style>
 </head>
 <body>
-    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-PJJTL8QX"
-    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
 
-    <div id="disclaimer-modal">
-        <div class="modal-content">
-            <h3 style="color:var(--accent-color); margin-top:0;">使用須知與免責聲明</h3>
-            <p style="font-size:14px; text-align:left; line-height:1.6; color:#666;">
-                1. 本平台僅供社交娛樂用途，開發者不對用戶言論負責。<br>
-                2. 嚴禁色情、騷擾、詐騙或任何非法行為。<br>
-                3. 系統不儲存對話內容，請自行保護個人隱私。<br>
-                4. 點擊同意即代表您已成年並願意遵守上述規範。
-            </p>
-            <button onclick="agreeDisclaimer()" style="background:var(--accent-color); color:white; border:none; padding:12px; border-radius:25px; font-weight:bold; cursor:pointer; width:100%; margin-top:10px;">我同意並進入</button>
+    <div id="sidebar">
+        <div class="sidebar-header">暖港野 HA TALK</div>
+        <div class="sidebar-menu">
+            <a href="#" class="menu-item active">即時配對聊天</a>
+            <a href="https://threads.net/@hatalk_canton" target="_blank" class="menu-item">HA-TALK 社群 (Threads)</a>
+            <a href="https://www.instagram.com/hatalk_canton" target="_blank" class="menu-item">HA-TALK 投稿對話 📸</a>
         </div>
+        <div style="padding: 20px; font-size: 11px; color: #888;">© 2026 暖港野 HA TALK</div>
     </div>
 
-    <header>暖港野 HA TALK</header>
-    <div id="chat-box">
-        <div class="system">請先閱讀並同意免責聲明</div>
-    </div>
-    <div id="input-area">
-        <input id="msg" placeholder="請先配對..." disabled>
-        <button id="btn" onclick="handleAction()" disabled>開始</button>
+    <div id="main-container">
+        <div id="disclaimer-modal">
+            <div class="modal-content">
+                <h3 style="color:var(--accent-color)">使用須知與免責聲明</h3>
+                <p style="text-align:left; font-size:14px; color:#666;">1. 嚴禁色情騷擾與詐騙。<br>2. 系統不儲存任何對話紀錄。<br>3. 投稿對話前請務必將對方暱稱打碼。</p>
+                <button onclick="agreeDisclaimer()" style="width:100%; height:45px; margin-top:10px;">我同意並進入</button>
+            </div>
+        </div>
+
+        <header>
+            <span onclick="toggleSidebar()" style="cursor:pointer;">☰</span>
+            暖港野 HA TALK
+            <span style="width:20px;"></span>
+        </header>
+        
+        <div id="typing-status"></div>
+        <div id="chat-box"></div>
+        
+        <div id="input-area">
+            <input id="msg" placeholder="請先配對..." disabled autocomplete="off">
+            <button id="btn" onclick="handleAction()" disabled>開始</button>
+        </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        const socket = io({ transports: ['websocket'] });
+        const socket = io();
         let currentRoom = null;
         const chatBox = document.getElementById('chat-box');
         const msgInput = document.getElementById('msg');
         const mainBtn = document.getElementById('btn');
+        const typingStatus = document.getElementById('typing-status');
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+        }
 
         function agreeDisclaimer() {
             document.getElementById('disclaimer-modal').style.display = 'none';
-            if (socket.connected) {
-                startSearch();
-            } else {
-                socket.on('connect', () => {
-                    startSearch();
-                });
-            }
+            if (socket.connected) startSearch();
+            else socket.on('connect', startSearch);
         }
 
         function handleAction() {
-            if (!currentRoom) {
-                startSearch();
-            } else {
-                sendMsg();
-            }
+            if (!currentRoom) startSearch();
+            else sendMsg();
         }
 
         function startSearch() {
@@ -205,23 +149,50 @@
             msgInput.value = '';
         }
 
-        socket.on('receive_msg', (text) => addMsg(text, 'partner'));
+        // 打字與已讀邏輯
+        msgInput.addEventListener('input', () => {
+            if (currentRoom) socket.emit('typing', { roomId: currentRoom });
+        });
+
+        msgInput.addEventListener('focus', () => {
+            if (currentRoom) socket.emit('msg_read', { roomId: currentRoom });
+        });
+
+        socket.on('receive_msg', (text) => {
+            typingStatus.innerText = '';
+            addMsg(text, 'partner');
+            // 如果視窗是開啟的，收到訊息立即回傳已讀
+            if (document.hasFocus()) {
+                socket.emit('msg_read', { roomId: currentRoom });
+            }
+        });
+
+        socket.on('partner_read', () => {
+            const lastMyMsgStatus = chatBox.querySelector('.me-wrapper:last-child .read-status');
+            if (lastMyMsgStatus) lastMyMsgStatus.innerText = '已讀';
+        });
+
+        socket.on('partner_typing', () => { typingStatus.innerText = '思考要說什麼...'; });
+        socket.on('partner_stop_typing', () => { typingStatus.innerText = ''; });
 
         socket.on('partner_left', () => {
             addSystemMsg('對方已離開。');
             currentRoom = null;
             msgInput.disabled = true;
-            msgInput.value = "";
-            msgInput.placeholder = "點擊「開始」重新配對";
             mainBtn.innerText = '開始';
-            mainBtn.disabled = false;
         });
 
         function addMsg(text, type) {
-            const div = document.createElement('div');
-            div.className = `msg ${type}`;
-            div.innerText = text;
-            chatBox.appendChild(div);
+            const wrapper = document.createElement('div');
+            wrapper.className = `msg-wrapper ${type === 'me' ? 'me-wrapper' : ''} ${type}`;
+            
+            let html = `<div class="msg ${type}">${text}</div>`;
+            if (type === 'me') {
+                html += `<div class="read-status"></div>`; // 初始顯示為空，等待 partner_read 觸發
+            }
+            
+            wrapper.innerHTML = html;
+            chatBox.appendChild(wrapper);
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
@@ -230,7 +201,6 @@
             div.className = 'system';
             div.innerText = text;
             chatBox.appendChild(div);
-            chatBox.scrollTop = chatBox.scrollHeight;
         }
 
         msgInput.addEventListener("keypress", (e) => {
