@@ -285,7 +285,7 @@
 
         function endChat() {
             if (!currentRoom) return;
-            if (confirm('真係要離開？對方會好傷心㗎喔 🥺')) {
+            if (confirm('真係要離開？對方會好傷心㗎喎 🥺')) {
                 socket.emit('end_chat');
                 addSystemMsg('你已離開對話');
                 resetToIdle();
