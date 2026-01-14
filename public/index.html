@@ -131,30 +131,29 @@
         const msgInput = document.getElementById('msg');
         const mainBtn = document.getElementById('btn');
         const typingStatus = document.getElementById('typing-status');
-
-        // ✅ 20 個笑話內容庫
-        const waitContent = [
-            { type: "繞口令", text: "入實驗室，撳緊急制。" },
-            { type: "繞口令", text: "郵差叔叔送信純熟迅速。" },
-            { type: "繞口令", text: "郭藹明過郭可盈，郭可盈過郭藹明，郭藹明話郭可盈過郭藹明。" },
-            { type: "繞口令", text: "去街市買魚頭，買個魚頭係苦嘅，所以係『苦魚頭』。" },
-            { type: "繞口令", text: "痴線蜘蛛條蜘蛛絲，黐住枝樹枝。" },
-            { type: "冷笑話", text: "咩動物最鍾意聞嘢？<br>... 係食蟻獸（因為佢食『蟻』）" },
-            { type: "冷笑話", text: "點解小明跑得快過火車？<br>... 因為小明喺火車入面跑。" },
-            { type: "冷笑話", text: "魚蛋粉點解無魚蛋？<br>... 因為佢叫『魚蛋，粉』（魚蛋係動詞）。" },
-            { type: "冷笑話", text: "邊個藝人最鍾意跳舞？<br>... 羅嘉良（因為：撈家，『跳』，良）。" },
-            { type: "冷笑話", text: "點解食得咁快？<br>... 因為食得快，好世界。" },
-            { type: "冷笑話", text: "鍵盤邊個掣最貴？<br>... 係 Space 掣（因為佢個面積最貴）。" },
-            { type: "冷笑話", text: "隆胸要幾多錢？<br>... 一『波』三折。" },
-            { type: "冷笑話", text: "點解豬唔識講嘢？<br>... 因為『豬』緘其口。" },
-            { type: "冷笑話", text: "邊位武打巨星最鍾意洗衫？<br>... 甄子丹（因為：甄子『浸』）。" },
-            { type: "冷笑話", text: "去到泰國要點樣叫嘢食？<br>... 打開個嘴叫。" },
-            { type: "小知識", text: "原來廣東話有 9 個聲調，你試下數：『詩史試時市事兒似寺』" },
-            { type: "投稿", text: "想你嘅爛 Gag 出現喺度？<br>去 IG @hatalk_canton 投稿啦！" },
-            { type: "投稿", text: "尋日最正對話截圖已上傳 Threads，去 bio 睇啦！" },
-            { type: "提醒", text: "匿名聊天雖然好玩，但記得都要尊重對方喔 ❤️" },
-            { type: "小貼士", text: "萬一唔知傾咩好，可以用我哋提供嘅『話題建議』掣！" }
-        ];
+// ✅ 修正語法後的笑話內容庫
+const waitContent = [
+    { type: "急口令", text: "入實驗室，撳緊急掣。" },
+    { type: "急口令", text: "郵差叔叔，送信純熟，迅速送出。" },
+    { type: "急口令", text: "一蚊一隻龜，七蚊一隻雞，你話龜貴定雞貴？" },
+    { type: "急口令", text: "痴線蜘蛛啲蜘蛛絲，黐住枝樹枝。" },
+    { type: "急口令", text: "郭藹明過郭可盈，郭可盈過郭藹明，郭藹明話郭可盈過郭藹明。" },
+    { type: "爛gag", text: "大明養小明，咁邊個養大明？<br>... 狗（因為「久」仰大明）" },
+    { type: "爛gag", text: "點解小明跑得快過火車？<br>... 因為小明喺火車入面跑。" },
+    { type: "爛gag", text: "咩動物成世都唔會長高？<br>... 龜（因為「龜苓膏」零高）" },
+    { type: "爛gag", text: "咩豬係得 1 隻腳？<br>... 珍寶「珠」" },
+    { type: "爛gag", text: "咩粥最鹹濕？<br>... 及第粥（因為「𥄫底」粥）" },
+    { type: "爛gag", text: "咩生果最容易種？<br>... 蕉（因為「中招」）" },
+    { type: "爛gag", text: "隆胸兩邊隆晒要一萬，但隆一邊只要三千，估一成語？<br>... 一「波」三折。" },
+    { type: "爛gag", text: "咩動物最鍾意聞底褲？<br>... 豹（因為豹「紋」底褲）" },
+    { type: "爛gag", text: "去到泰國要點樣叫嘢食？<br>... 打開個嘴叫。" },
+    { type: "爛gag", text: "鍵盤邊個掣最貴？<br>... Space 掣（因為個面積最貴）。" },
+    { type: "冷知識", text: "原來廣東話有 9 個聲調，你試下數：『詩史試時市事兒似寺』" },
+    { type: "投稿", text: "想你嘅爛 Gag 出現喺度？<br>去 IG @hatalk_canton 投稿啦！" },
+    { type: "投稿", text: "尋日最正對話截圖已上傳 Threads，去 bio 睇啦！" },
+    { type: "提醒", text: "匿名聊天雖然好玩，但記得都要尊重對方喔 ❤️" },
+    { type: "小貼士", text: "萬一唔知傾咩好，可以用我哋提供嘅『話題建議』掣！" }
+];
 
         function toggleSidebar(e) { e.stopPropagation(); document.getElementById('sidebar').classList.toggle('open'); }
         function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); }
