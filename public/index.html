@@ -22,38 +22,35 @@
         }
         body { font-family: -apple-system, sans-serif; margin: 0; background: var(--bg-color); height: 100vh; display: flex; color: var(--text-white); overflow: hidden; }
         
-        /* Sidebar & Overlay */
         #sidebar { width: 260px; background: var(--sidebar-bg); border-right: 1px solid rgba(0,0,0,0.2); display: flex; flex-direction: column; transition: 0.3s ease; z-index: 2000; }
         .sidebar-header { padding: 25px 20px; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.1); }
         .menu-item { padding: 15px 20px; color: #ddd; text-decoration: none; display: block; cursor: pointer; }
         .menu-item.active { background: var(--accent-color); color: white; }
         #overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1500; }
 
-        /* Main Area */
         #main-container { flex: 1; display: flex; flex-direction: column; position: relative; transition: 0.3s; width: 100%; }
         header { background: var(--header-color); padding: 15px; display: flex; align-items: center; justify-content: space-between; font-weight: bold; }
         
         #chat-box { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
         
-        /* Topic Suggestion Style */
+        /* 💡 新增：笑話卡片樣式 */
+        .joke-fade {
+            animation: fadeIn 0.8s ease-in-out;
+            background: rgba(160, 139, 171, 0.15) !important;
+            border-left: 4px solid var(--accent-color);
+            border-radius: 8px;
+            padding: 12px 16px !important;
+            max-width: 85%;
+            margin: 15px auto !important;
+            box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
+            text-align: left;
+            line-height: 1.6;
+        }
+        .joke-fade small { color: var(--accent-color); font-weight: bold; font-size: 11px; }
+
         .suggestion-container { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 10px 0; }
-        .topic-btn { 
-            background: var(--accent-color); 
-            color: white; 
-            border: none; 
-            padding: 10px 16px; 
-            border-radius: 15px; 
-            font-size: 14px; 
-            cursor: pointer; 
-            transition: 0.2s;
-            /* ✅ 防止手機誤觸 */
-            -webkit-tap-highlight-color: transparent;
-            user-select: none;
-        }
-        .topic-btn:active { 
-            opacity: 0.7; 
-            transform: scale(0.95); 
-        }
+        .topic-btn { background: var(--accent-color); color: white; border: none; padding: 10px 16px; border-radius: 15px; font-size: 14px; cursor: pointer; transition: 0.2s; -webkit-tap-highlight-color: transparent; user-select: none; }
+        .topic-btn:active { opacity: 0.7; transform: scale(0.95); }
 
         #typing-status { font-size: 12px; color: #d1d1d1; padding: 5px 20px; height: 20px; font-style: italic; background: rgba(0,0,0,0.05); }
 
@@ -66,86 +63,23 @@
         .read-status { font-size: 10px; color: #ccc; margin-top: 2px; height: 12px; }
         .system { align-self: center; font-size: 12px; color: #d1d1d1; background: rgba(0,0,0,0.2); padding: 6px 14px; border-radius: 12px; text-align: center; }
 
-        /* End Button - 改進手機版顯示 */
-        #end-btn {
-            background: rgba(220, 60, 60, 0.9);
-            border: none;
-            color: white;
-            font-weight: bold;
-            padding: 0 16px;
-            margin-right: 8px;
-            border-radius: 25px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: 0.2s;
-            white-space: nowrap;
-            /* ✅ 確保按鈕可見 */
-            flex-shrink: 0;
-            min-width: 50px;
-        }
-        #end-btn:active {
-            background: rgba(200, 40, 40, 1);
-            transform: scale(0.95);
-        }
+        #end-btn { background: rgba(220, 60, 60, 0.9); border: none; color: white; font-weight: bold; padding: 0 16px; margin-right: 8px; border-radius: 25px; cursor: pointer; font-size: 14px; transition: 0.2s; flex-shrink: 0; min-width: 50px; }
+        #end-btn:active { background: rgba(200, 40, 40, 1); transform: scale(0.95); }
 
-        #input-area { 
-            background: var(--header-color); 
-            padding: 10px; 
-            display: flex; 
-            gap: 8px;
-            padding-bottom: calc(10px + env(safe-area-inset-bottom)); 
-        }
-        
-        input { 
-            flex: 1; 
-            border: none; 
-            background: rgba(255,255,255,0.15); 
-            padding: 12px 16px; 
-            border-radius: 25px; 
-            color: white; 
-            outline: none; 
-            font-size: 16px;
-            min-width: 0; /* ✅ 防止輸入框擠壓按鈕 */
-        }
-        
-        button#btn { 
-            background: var(--accent-color); 
-            border: none; 
-            color: white; 
-            font-weight: bold; 
-            padding: 0 20px; 
-            border-radius: 25px; 
-            cursor: pointer;
-            flex-shrink: 0; /* ✅ 防止按鈕被壓縮 */
-            min-width: 60px;
-        }
+        #input-area { background: var(--header-color); padding: 10px; display: flex; gap: 8px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+        input { flex: 1; border: none; background: rgba(255,255,255,0.15); padding: 12px 16px; border-radius: 25px; color: white; outline: none; font-size: 16px; min-width: 0; }
+        button#btn { background: var(--accent-color); border: none; color: white; font-weight: bold; padding: 0 20px; border-radius: 25px; cursor: pointer; flex-shrink: 0; min-width: 60px; }
         button#btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
         @media (max-width: 768px) {
             #sidebar { position: absolute; left: -260px; height: 100%; }
             #sidebar.open { left: 0; }
             #sidebar.open ~ #overlay { display: block; }
             #sidebar.open ~ #main-container { transform: translateX(260px); }
-            
-            /* ✅ 手機版調整 */
-            .topic-btn { 
-                padding: 12px 18px; 
-                font-size: 15px;
-                min-height: 44px; /* iOS 推薦的最小觸控尺寸 */
-            }
-            
-            #end-btn {
-                padding: 0 14px;
-                font-size: 13px;
-            }
-            
-            button#btn {
-                padding: 0 18px;
-                font-size: 14px;
-            }
+            .topic-btn { padding: 12px 18px; font-size: 15px; min-height: 44px; }
         }
-
-        /* Disclaimer Modal */
         #disclaimer-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; justify-content: center; align-items: center; z-index: 9999; }
         .modal-content { background: white; color: #333; padding: 25px; border-radius: 15px; width: 85%; max-width: 400px; text-align: center; }
     </style>
@@ -191,19 +125,39 @@
         const socket = io();
         let currentRoom = null;
         let typingTimeout = null;
+        let waitTimer = null; // ✅ 輪播計時器
+
         const chatBox = document.getElementById('chat-box');
         const msgInput = document.getElementById('msg');
         const mainBtn = document.getElementById('btn');
         const typingStatus = document.getElementById('typing-status');
 
-        function toggleSidebar(e) { 
-            e.stopPropagation(); 
-            document.getElementById('sidebar').classList.toggle('open'); 
-        }
-        
-        function closeSidebar() { 
-            document.getElementById('sidebar').classList.remove('open'); 
-        }
+        // ✅ 20 個笑話內容庫
+        const waitContent = [
+            { type: "繞口令", text: "入實驗室，撳緊急制。" },
+            { type: "繞口令", text: "郵差叔叔送信純熟迅速。" },
+            { type: "繞口令", text: "郭藹明過郭可盈，郭可盈過郭藹明，郭藹明話郭可盈過郭藹明。" },
+            { type: "繞口令", text: "去街市買魚頭，買個魚頭係苦嘅，所以係『苦魚頭』。" },
+            { type: "繞口令", text: "痴線蜘蛛條蜘蛛絲，黐住枝樹枝。" },
+            { type: "冷笑話", text: "咩動物最鍾意聞嘢？<br>... 係食蟻獸（因為佢食『蟻』）" },
+            { type: "冷笑話", text: "點解小明跑得快過火車？<br>... 因為小明喺火車入面跑。" },
+            { type: "冷笑話", text: "魚蛋粉點解無魚蛋？<br>... 因為佢叫『魚蛋，粉』（魚蛋係動詞）。" },
+            { type: "冷笑話", text: "邊個藝人最鍾意跳舞？<br>... 羅嘉良（因為：撈家，『跳』，良）。" },
+            { type: "冷笑話", text: "點解食得咁快？<br>... 因為食得快，好世界。" },
+            { type: "冷笑話", text: "鍵盤邊個掣最貴？<br>... 係 Space 掣（因為佢個面積最貴）。" },
+            { type: "冷笑話", text: "隆胸要幾多錢？<br>... 一『波』三折。" },
+            { type: "冷笑話", text: "點解豬唔識講嘢？<br>... 因為『豬』緘其口。" },
+            { type: "冷笑話", text: "邊位武打巨星最鍾意洗衫？<br>... 甄子丹（因為：甄子『浸』）。" },
+            { type: "冷笑話", text: "去到泰國要點樣叫嘢食？<br>... 打開個嘴叫。" },
+            { type: "小知識", text: "原來廣東話有 9 個聲調，你試下數：『詩史試時市事兒似寺』" },
+            { type: "投稿", text: "想你嘅爛 Gag 出現喺度？<br>去 IG @hatalk_canton 投稿啦！" },
+            { type: "投稿", text: "尋日最正對話截圖已上傳 Threads，去 bio 睇啦！" },
+            { type: "提醒", text: "匿名聊天雖然好玩，但記得都要尊重對方喔 ❤️" },
+            { type: "小貼士", text: "萬一唔知傾咩好，可以用我哋提供嘅『話題建議』掣！" }
+        ];
+
+        function toggleSidebar(e) { e.stopPropagation(); document.getElementById('sidebar').classList.toggle('open'); }
+        function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); }
 
         function agreeDisclaimer() {
             document.getElementById('disclaimer-modal').style.display = 'none';
@@ -216,6 +170,7 @@
             else sendMsg();
         }
 
+        // ✅ 修正：啟動搜尋並開啟笑話輪播
         function startSearch() {
             socket.emit('start_chat');
             mainBtn.innerText = '搵緊人';
@@ -223,71 +178,62 @@
             chatBox.innerHTML = ''; 
             removeEndChatButton();
             addSystemMsg('等陣哈，幫你搵緊人同你傾計...');
+
+            // 啟動笑話輪播
+            const showJoke = () => {
+                const item = waitContent[Math.floor(Math.random() * waitContent.length)];
+                const oldJoke = document.querySelector('.joke-fade');
+                if (oldJoke) oldJoke.remove();
+                
+                const jokeDiv = document.createElement('div');
+                jokeDiv.className = 'joke-fade';
+                jokeDiv.innerHTML = `<small>[${item.type}]</small><br>${item.text}`;
+                chatBox.appendChild(jokeDiv);
+                chatBox.scrollTop = chatBox.scrollHeight;
+            };
+
+            showJoke();
+            if (waitTimer) clearInterval(waitTimer);
+            waitTimer = setInterval(showJoke, 5000); // 每 5 秒換一個
         }
 
-        socket.on('waiting', (data) => {
-            addSystemMsg(data.msg);
-        });
-
-        socket.on('queue_timeout', (data) => {
-            addSystemMsg(`${data.msg}（等候: ${data.waitingCount} 人）`);
-        });
-
-        socket.on('error', (data) => {
-            addSystemMsg(`⚠️ ${data.msg}`);
-            if (data.msg.includes('已經在聊天中')) {
-                showEndChatButton();
-            }
-        });
-
         socket.on('matched', (data) => {
+            if (waitTimer) clearInterval(waitTimer); // ✅ 停止笑話
             currentRoom = data.roomId;
             chatBox.innerHTML = ''; 
             addSystemMsg('搵到人喇！開口傾下計啦 💬');
             
-            // ✅ 修正：話題按鈕點擊處理
             if (data.topics && data.topics.length > 0) {
                 const container = document.createElement('div');
                 container.className = 'suggestion-container';
-                
                 data.topics.forEach(topic => {
                     const btn = document.createElement('button');
                     btn.className = 'topic-btn';
                     btn.innerText = topic;
-                    
-                    // ✅ 使用 addEventListener 而不是 onclick，並正確傳遞話題文字
                     btn.addEventListener('click', function() {
-                        msgInput.value = topic; // 使用閉包捕獲的 topic 變數
+                        msgInput.value = topic;
                         msgInput.focus();
                         sendMsg();
                         container.remove();
                     });
-                    
                     container.appendChild(btn);
                 });
-                
                 chatBox.appendChild(container);
-                chatBox.scrollTop = chatBox.scrollHeight;
             }
 
             showEndChatButton();
-
             msgInput.disabled = false;
             msgInput.placeholder = "輸入訊息...";
             msgInput.focus();
             mainBtn.innerText = '傳送';
             mainBtn.disabled = false;
+            setTimeout(() => { chatBox.scrollTop = chatBox.scrollHeight; }, 100);
         });
 
         function sendMsg() {
             const text = msgInput.value.trim();
             if(!text || !currentRoom) return;
-            
-            if (text.length > 1000) {
-                addSystemMsg('⚠️ 訊息太長（最多1000字）');
-                return;
-            }
-            
+            if (text.length > 1000) { addSystemMsg('⚠️ 訊息太長'); return; }
             socket.emit('send_msg', { roomId: currentRoom, msg: text });
             addMsg(text, 'me');
             msgInput.value = '';
@@ -297,12 +243,8 @@
         msgInput.addEventListener('input', () => { 
             if (currentRoom) {
                 socket.emit('typing', { roomId: currentRoom });
-                
                 if (typingTimeout) clearTimeout(typingTimeout);
-                
-                typingTimeout = setTimeout(() => {
-                    socket.emit('stop_typing', { roomId: currentRoom });
-                }, 2000);
+                typingTimeout = setTimeout(() => { socket.emit('stop_typing', { roomId: currentRoom }); }, 2000);
             }
         });
 
@@ -318,21 +260,12 @@
             if (lastMyMsg) lastMyMsg.innerText = '已讀';
         });
 
-        socket.on('partner_typing', () => { 
-            typingStatus.innerText = '對方諗緊點覆你...'; 
-        });
-        
-        socket.on('partner_stop_typing', () => { 
-            typingStatus.innerText = ''; 
-        });
+        socket.on('partner_typing', () => { typingStatus.innerText = '對方諗緊點覆你...'; });
+        socket.on('partner_stop_typing', () => { typingStatus.innerText = ''; });
 
         socket.on('partner_left', (data) => {
+            if (waitTimer) clearInterval(waitTimer);
             addSystemMsg(data.msg || '對方走咗喇。');
-            resetToIdle();
-        });
-
-        socket.on('chat_ended', (data) => {
-            addSystemMsg(data.msg || '對話已結束');
             resetToIdle();
         });
 
@@ -347,19 +280,12 @@
             removeEndChatButton();
         }
 
-        function showEndChatButton() {
-            const endBtn = document.getElementById('end-btn');
-            if (endBtn) endBtn.style.display = 'block';
-        }
-
-        function removeEndChatButton() {
-            const endBtn = document.getElementById('end-btn');
-            if (endBtn) endBtn.style.display = 'none';
-        }
+        function showEndChatButton() { document.getElementById('end-btn').style.display = 'block'; }
+        function removeEndChatButton() { document.getElementById('end-btn').style.display = 'none'; }
 
         function endChat() {
             if (!currentRoom) return;
-            if (confirm('確定要離開對話？')) {
+            if (confirm('真係要離開？對方會好傷心㗎喔 🥺')) {
                 socket.emit('end_chat');
                 addSystemMsg('你已離開對話');
                 resetToIdle();
@@ -369,11 +295,8 @@
         function addMsg(text, type) {
             const wrapper = document.createElement('div');
             wrapper.className = `msg-wrapper ${type === 'me' ? 'me-wrapper' : ''} ${type}`;
-            
             const safeText = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            
-            wrapper.innerHTML = `<div class="msg ${type}">${safeText}</div>` + 
-                               (type === 'me' ? '<div class="read-status"></div>' : '');
+            wrapper.innerHTML = `<div class="msg ${type}">${safeText}</div>` + (type === 'me' ? '<div class="read-status"></div>' : '');
             chatBox.appendChild(wrapper);
             chatBox.scrollTop = chatBox.scrollHeight;
         }
@@ -386,22 +309,12 @@
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        msgInput.addEventListener("keypress", (e) => { 
-            if (e.key === "Enter" && !msgInput.disabled) {
-                handleAction(); 
-            }
-        });
+        msgInput.addEventListener("keypress", (e) => { if (e.key === "Enter" && !msgInput.disabled) handleAction(); });
 
         socket.on('disconnect', () => {
-            addSystemMsg('⚠️ 連線中斷，嘗試重新連線...');
+            if (waitTimer) clearInterval(waitTimer);
+            addSystemMsg('⚠️ 連線中斷');
             mainBtn.disabled = true;
-        });
-
-        socket.on('connect', () => {
-            if (currentRoom) {
-                addSystemMsg('✅ 已重新連線，但對話已中斷，請重新開始');
-                resetToIdle();
-            }
         });
     </script>
 </body>
