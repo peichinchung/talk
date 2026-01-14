@@ -3,10 +3,9 @@ const app = express();
 const http = require('http').Server(app);
 const io = require('socket.io')(http, {
     cors: { 
-        origin: process.env.NODE_ENV === 'production' 
-            ? ["https://yourdomain.com"] 
-            : "*", 
-        methods: ["GET", "POST"] 
+        origin: process.env.CORS_ORIGIN || "*",
+        methods: ["GET", "POST"],
+        credentials: true
     }
 });
 
@@ -14,6 +13,7 @@ app.use(express.static('public'));
 
 let waitingQueue = [];
 const MAX_CONNECTIONS = 1000;
+const messageRateLimit = new Map(); // ✅ 新增：訊息速率限制
 
 const allTopics = [
     "🔥 最近個單新聞點睇？",
@@ -38,7 +38,8 @@ app.get('/health', (req, res) => {
         online: io.sockets.sockets.size,
         waiting: waitingQueue.length,
         rooms: Array.from(io.sockets.adapter.rooms.keys())
-            .filter(r => r.startsWith('room_')).length
+            .filter(r => r.startsWith('room_')).length,
+        timestamp: new Date().toISOString()
     });
 });
 
@@ -119,6 +120,20 @@ io.on('connection', (socket) => {
     });
 
     socket.on('send_msg', (data) => {
+        // ✅ 速率限制（每秒最多 5 則訊息）
+        const now = Date.now();
+        const userMessages = messageRateLimit.get(socket.id) || [];
+        const recentMessages = userMessages.filter(time => now - time < 1000);
+        
+        if (recentMessages.length >= 5) {
+            socket.emit('error', { msg: '發送太快，請稍候' });
+            return;
+        }
+        
+        recentMessages.push(now);
+        messageRateLimit.set(socket.id, recentMessages);
+        
+        // 驗證訊息
         if (!data || !data.msg || typeof data.msg !== 'string') {
             socket.emit('error', { msg: '無效訊息格式' });
             return;
@@ -181,6 +196,9 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         console.log(`❌ 用戶斷線: ${socket.id}`);
         
+        // ✅ 清理速率限制記錄
+        messageRateLimit.delete(socket.id);
+        
         waitingQueue = waitingQueue.filter(id => id !== socket.id);
         
         if (socket.queueTimeout) {
@@ -216,6 +234,19 @@ function cleanupRoom(roomId) {
     }
 }
 
+// ✅ 定期清理過期的速率限制記錄（每 5 分鐘）
+setInterval(() => {
+    const now = Date.now();
+    for (const [socketId, messages] of messageRateLimit.entries()) {
+        const recentMessages = messages.filter(time => now - time < 60000);
+        if (recentMessages.length === 0) {
+            messageRateLimit.delete(socketId);
+        } else {
+            messageRateLimit.set(socketId, recentMessages);
+        }
+    }
+}, 300000);
+
 setInterval(() => {
     const stats = {
         在線用戶: io.sockets.sockets.size,
@@ -230,4 +261,5 @@ const PORT = process.env.PORT || 3000;
 http.listen(PORT, '0.0.0.0', () => {
     console.log(`✅ 暖港野伺服器已啟動於 Port: ${PORT}`);
     console.log(`🌐 訪問地址: http://localhost:${PORT}`);
+    console.log(`🔒 CORS: ${process.env.CORS_ORIGIN || "*"}`);
 });

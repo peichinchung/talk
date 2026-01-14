@@ -37,8 +37,23 @@
         
         /* Topic Suggestion Style */
         .suggestion-container { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 10px 0; }
-        .topic-btn { background: var(--accent-color); color: white; border: none; padding: 8px 15px; border-radius: 15px; font-size: 13px; cursor: pointer; transition: 0.2s; }
-        .topic-btn:hover { opacity: 0.8; transform: scale(1.05); }
+        .topic-btn { 
+            background: var(--accent-color); 
+            color: white; 
+            border: none; 
+            padding: 10px 16px; 
+            border-radius: 15px; 
+            font-size: 14px; 
+            cursor: pointer; 
+            transition: 0.2s;
+            /* ✅ 防止手機誤觸 */
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+        .topic-btn:active { 
+            opacity: 0.7; 
+            transform: scale(0.95); 
+        }
 
         #typing-status { font-size: 12px; color: #d1d1d1; padding: 5px 20px; height: 20px; font-style: italic; background: rgba(0,0,0,0.05); }
 
@@ -51,26 +66,59 @@
         .read-status { font-size: 10px; color: #ccc; margin-top: 2px; height: 12px; }
         .system { align-self: center; font-size: 12px; color: #d1d1d1; background: rgba(0,0,0,0.2); padding: 6px 14px; border-radius: 12px; text-align: center; }
 
-        /* End Button */
+        /* End Button - 改進手機版顯示 */
         #end-btn {
             background: rgba(220, 60, 60, 0.9);
             border: none;
             color: white;
             font-weight: bold;
-            padding: 0 15px;
-            margin-right: 10px;
+            padding: 0 16px;
+            margin-right: 8px;
             border-radius: 25px;
             cursor: pointer;
             font-size: 14px;
             transition: 0.2s;
+            white-space: nowrap;
+            /* ✅ 確保按鈕可見 */
+            flex-shrink: 0;
+            min-width: 50px;
         }
-        #end-btn:hover {
+        #end-btn:active {
             background: rgba(200, 40, 40, 1);
+            transform: scale(0.95);
         }
 
-        #input-area { background: var(--header-color); padding: 12px; display: flex; padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
-        input { flex: 1; border: none; background: rgba(255,255,255,0.15); padding: 12px 18px; border-radius: 25px; color: white; outline: none; font-size: 16px; }
-        button#btn { background: var(--accent-color); border: none; color: white; font-weight: bold; padding: 0 20px; margin-left: 10px; border-radius: 25px; cursor: pointer; }
+        #input-area { 
+            background: var(--header-color); 
+            padding: 10px; 
+            display: flex; 
+            gap: 8px;
+            padding-bottom: calc(10px + env(safe-area-inset-bottom)); 
+        }
+        
+        input { 
+            flex: 1; 
+            border: none; 
+            background: rgba(255,255,255,0.15); 
+            padding: 12px 16px; 
+            border-radius: 25px; 
+            color: white; 
+            outline: none; 
+            font-size: 16px;
+            min-width: 0; /* ✅ 防止輸入框擠壓按鈕 */
+        }
+        
+        button#btn { 
+            background: var(--accent-color); 
+            border: none; 
+            color: white; 
+            font-weight: bold; 
+            padding: 0 20px; 
+            border-radius: 25px; 
+            cursor: pointer;
+            flex-shrink: 0; /* ✅ 防止按鈕被壓縮 */
+            min-width: 60px;
+        }
         button#btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
         @media (max-width: 768px) {
@@ -78,6 +126,23 @@
             #sidebar.open { left: 0; }
             #sidebar.open ~ #overlay { display: block; }
             #sidebar.open ~ #main-container { transform: translateX(260px); }
+            
+            /* ✅ 手機版調整 */
+            .topic-btn { 
+                padding: 12px 18px; 
+                font-size: 15px;
+                min-height: 44px; /* iOS 推薦的最小觸控尺寸 */
+            }
+            
+            #end-btn {
+                padding: 0 14px;
+                font-size: 13px;
+            }
+            
+            button#btn {
+                padding: 0 18px;
+                font-size: 14px;
+            }
         }
 
         /* Disclaimer Modal */
@@ -180,21 +245,27 @@
             chatBox.innerHTML = ''; 
             addSystemMsg('搵到人喇！開口傾下計啦 💬');
             
+            // ✅ 修正：話題按鈕點擊處理
             if (data.topics && data.topics.length > 0) {
                 const container = document.createElement('div');
                 container.className = 'suggestion-container';
-                data.topics.forEach(t => {
-                    const b = document.createElement('button');
-                    b.className = 'topic-btn';
-                    b.innerText = t;
-                    b.onclick = () => {
-                        msgInput.value = t;
+                
+                data.topics.forEach(topic => {
+                    const btn = document.createElement('button');
+                    btn.className = 'topic-btn';
+                    btn.innerText = topic;
+                    
+                    // ✅ 使用 addEventListener 而不是 onclick，並正確傳遞話題文字
+                    btn.addEventListener('click', function() {
+                        msgInput.value = topic; // 使用閉包捕獲的 topic 變數
                         msgInput.focus();
                         sendMsg();
                         container.remove();
-                    };
-                    container.appendChild(b);
+                    });
+                    
+                    container.appendChild(btn);
                 });
+                
                 chatBox.appendChild(container);
                 chatBox.scrollTop = chatBox.scrollHeight;
             }
@@ -276,7 +347,6 @@
             removeEndChatButton();
         }
 
-        // ✅ 修正：操作正確的按鈕
         function showEndChatButton() {
             const endBtn = document.getElementById('end-btn');
             if (endBtn) endBtn.style.display = 'block';
