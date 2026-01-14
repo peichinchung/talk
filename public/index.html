@@ -22,41 +22,40 @@
         }
         body { font-family: -apple-system, sans-serif; margin: 0; background: var(--bg-color); height: 100vh; display: flex; color: var(--text-white); overflow: hidden; }
         
-        /* Side Bar Style */
-        #sidebar { width: 260px; background: var(--sidebar-bg); border-right: 1px solid rgba(0,0,0,0.2); display: flex; flex-direction: column; transition: transform 0.3s ease; }
-        .sidebar-header { padding: 20px; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.1); font-size: 18px; }
-        .sidebar-menu { flex: 1; padding: 10px; }
-        .menu-item { padding: 12px 15px; border-radius: 8px; margin-bottom: 5px; cursor: pointer; transition: 0.2s; color: #ddd; text-decoration: none; display: block; }
-        .menu-item:hover { background: rgba(255,255,255,0.1); color: white; }
+        /* Sidebar */
+        #sidebar { width: 260px; background: var(--sidebar-bg); border-right: 1px solid rgba(0,0,0,0.2); display: flex; flex-direction: column; transition: 0.3s ease; z-index: 2000; position: relative; }
+        .sidebar-header { padding: 25px 20px; font-weight: bold; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .menu-item { padding: 15px 20px; color: #ddd; text-decoration: none; display: block; transition: 0.2s; }
+        .menu-item:hover { background: rgba(255,255,255,0.1); }
         .menu-item.active { background: var(--accent-color); color: white; }
 
-        /* Main Chat Area */
-        #main-container { flex: 1; display: flex; flex-direction: column; position: relative; }
-        header { background: var(--header-color); padding: 15px; text-align: center; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2); display: flex; justify-content: space-between; align-items: center; }
+        /* Main Container */
+        #main-container { flex: 1; display: flex; flex-direction: column; position: relative; transition: 0.3s; }
+        header { background: var(--header-color); padding: 15px; display: flex; align-items: center; justify-content: space-between; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
         
-        #typing-status { font-size: 12px; color: #d1d1d1; padding: 5px 20px; height: 18px; font-style: italic; background: rgba(0,0,0,0.1); }
         #chat-box { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
-        
-        /* Message Bubbles */
-        .msg-wrapper { display: flex; flex-direction: column; max-width: 75%; }
+        #typing-status { font-size: 12px; color: #d1d1d1; padding: 5px 20px; height: 18px; font-style: italic; }
+
+        /* Messages */
+        .msg-wrapper { display: flex; flex-direction: column; max-width: 75%; position: relative; }
         .msg-wrapper.me { align-self: flex-end; align-items: flex-end; }
         .msg-wrapper.partner { align-self: flex-start; }
-        
-        .msg { padding: 12px 16px; border-radius: 20px; font-size: 15px; line-height: 1.4; word-wrap: break-word; position: relative; }
+        .msg { padding: 12px 16px; border-radius: 20px; font-size: 15px; line-height: 1.4; word-wrap: break-word; }
         .msg.me { background: var(--my-msg); border-bottom-right-radius: 4px; }
         .msg.partner { background: var(--partner-msg); border-bottom-left-radius: 4px; }
-        
-        .read-status { font-size: 10px; color: #ccc; margin-top: 2px; }
+        .read-status { font-size: 10px; color: #ccc; margin-top: 2px; height: 12px; }
         .system { align-self: center; font-size: 12px; color: #d1d1d1; background: rgba(0,0,0,0.2); padding: 6px 14px; border-radius: 12px; }
 
-        #input-area { background: var(--header-color); padding: 12px; display: flex; border-top: 1px solid rgba(0,0,0,0.1); padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+        /* Input Area */
+        #input-area { background: var(--header-color); padding: 12px; display: flex; padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
         input { flex: 1; border: none; background: rgba(255,255,255,0.15); padding: 12px 18px; border-radius: 25px; color: white; outline: none; }
-        button { background: var(--accent-color); border: none; color: white; font-weight: bold; padding: 0 20px; margin-left: 10px; border-radius: 25px; cursor: pointer; }
-        
-        /* Mobile adjustment */
+        button#btn { background: var(--accent-color); border: none; color: white; font-weight: bold; padding: 0 20px; margin-left: 10px; border-radius: 25px; cursor: pointer; }
+
+        /* Mobile Mobile Sidebar logic */
         @media (max-width: 768px) {
-            #sidebar { position: absolute; left: -260px; height: 100%; z-index: 100; }
-            #sidebar.open { transform: translateX(260px); }
+            #sidebar { position: absolute; left: -260px; height: 100%; }
+            #sidebar.open { left: 0; }
+            #sidebar.open ~ #main-container { transform: translateX(260px); filter: brightness(0.6); pointer-events: none; }
         }
 
         #disclaimer-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; justify-content: center; align-items: center; z-index: 9999; }
@@ -67,27 +66,24 @@
 
     <div id="sidebar">
         <div class="sidebar-header">暖港野 HA TALK</div>
-        <div class="sidebar-menu">
-            <a href="#" class="menu-item active">即時配對聊天</a>
-            <a href="https://threads.net/@hatalk_canton" target="_blank" class="menu-item">HA-TALK 社群 (Threads)</a>
-            <a href="https://www.instagram.com/hatalk_canton" target="_blank" class="menu-item">HA-TALK 投稿對話 📸</a>
-        </div>
-        <div style="padding: 20px; font-size: 11px; color: #888;">© 2026 暖港野 HA TALK</div>
+        <div class="menu-item active">🏠 即時配對聊天</div>
+        <a href="https://threads.net/@your_account" target="_blank" class="menu-item">🧵 Threads 社群</a>
+        <a href="https://forms.gle/your_form" target="_blank" class="menu-item">📸 投稿對話</a>
     </div>
 
-    <div id="main-container">
+    <div id="main-container" onclick="closeSidebar()">
         <div id="disclaimer-modal">
             <div class="modal-content">
                 <h3 style="color:var(--accent-color)">使用須知與免責聲明</h3>
-                <p style="text-align:left; font-size:14px; color:#666;">1. 嚴禁色情騷擾與詐騙。<br>2. 系統不儲存任何對話紀錄。<br>3. 投稿對話前請務必將對方暱稱打碼。</p>
-                <button onclick="agreeDisclaimer()" style="width:100%; height:45px; margin-top:10px;">我同意並進入</button>
+                <p style="text-align:left; font-size:14px; color:#666;">1. 嚴禁騷擾、詐騙或非法行為。<br>2. 系統不儲存對話。<br>3. 點擊同意即代表您已成年。</p>
+                <button onclick="agreeDisclaimer()" style="background:var(--accent-color); color:white; border:none; padding:12px; border-radius:25px; width:100%; font-weight:bold;">我同意並進入</button>
             </div>
         </div>
 
         <header>
-            <span onclick="toggleSidebar()" style="cursor:pointer;">☰</span>
+            <span onclick="toggleSidebar(event)" style="cursor:pointer; padding:5px 15px; font-size:20px;">☰</span>
             暖港野 HA TALK
-            <span style="width:20px;"></span>
+            <span style="width:50px;"></span>
         </header>
         
         <div id="typing-status"></div>
@@ -108,8 +104,13 @@
         const mainBtn = document.getElementById('btn');
         const typingStatus = document.getElementById('typing-status');
 
-        function toggleSidebar() {
+        // Sidebar 邏輯
+        function toggleSidebar(e) {
+            e.stopPropagation();
             document.getElementById('sidebar').classList.toggle('open');
+        }
+        function closeSidebar() {
+            document.getElementById('sidebar').classList.remove('open');
         }
 
         function agreeDisclaimer() {
@@ -147,13 +148,13 @@
             socket.emit('send_msg', { roomId: currentRoom, msg: text });
             addMsg(text, 'me');
             msgInput.value = '';
+            socket.emit('stop_typing', { roomId: currentRoom });
         }
 
-        // 打字與已讀邏輯
+        // 打字與已讀
         msgInput.addEventListener('input', () => {
             if (currentRoom) socket.emit('typing', { roomId: currentRoom });
         });
-
         msgInput.addEventListener('focus', () => {
             if (currentRoom) socket.emit('msg_read', { roomId: currentRoom });
         });
@@ -161,18 +162,15 @@
         socket.on('receive_msg', (text) => {
             typingStatus.innerText = '';
             addMsg(text, 'partner');
-            // 如果視窗是開啟的，收到訊息立即回傳已讀
-            if (document.hasFocus()) {
-                socket.emit('msg_read', { roomId: currentRoom });
-            }
+            if (document.hasFocus()) socket.emit('msg_read', { roomId: currentRoom });
         });
 
         socket.on('partner_read', () => {
-            const lastMyMsgStatus = chatBox.querySelector('.me-wrapper:last-child .read-status');
-            if (lastMyMsgStatus) lastMyMsgStatus.innerText = '已讀';
+            const lastMyMsg = chatBox.querySelector('.me-wrapper:last-child .read-status');
+            if (lastMyMsg) lastMyMsg.innerText = '已讀';
         });
 
-        socket.on('partner_typing', () => { typingStatus.innerText = '思考要說什麼...'; });
+        socket.on('partner_typing', () => { typingStatus.innerText = '對方諗緊點覆你...'; });
         socket.on('partner_stop_typing', () => { typingStatus.innerText = ''; });
 
         socket.on('partner_left', () => {
@@ -185,13 +183,7 @@
         function addMsg(text, type) {
             const wrapper = document.createElement('div');
             wrapper.className = `msg-wrapper ${type === 'me' ? 'me-wrapper' : ''} ${type}`;
-            
-            let html = `<div class="msg ${type}">${text}</div>`;
-            if (type === 'me') {
-                html += `<div class="read-status"></div>`; // 初始顯示為空，等待 partner_read 觸發
-            }
-            
-            wrapper.innerHTML = html;
+            wrapper.innerHTML = `<div class="msg ${type}">${text}</div>` + (type === 'me' ? '<div class="read-status"></div>' : '');
             chatBox.appendChild(wrapper);
             chatBox.scrollTop = chatBox.scrollHeight;
         }
