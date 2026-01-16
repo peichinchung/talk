@@ -7,67 +7,80 @@ const io = require('socket.io')(http, {
         methods: ["GET", "POST"],
         credentials: true
     },
-    pingTimeout: 30000,
-    pingInterval: 10000
+    // ✅ 優化手機體驗：
+    // pingTimeout: 伺服器多久沒收到心跳才算斷線。
+    // 手機網絡不穩，建議設長一點 (由 30000 改為 60000)，避免用戶切換 App 時馬上斷線。
+    pingTimeout: 60000, 
+    pingInterval: 25000 
 });
 
 app.use(express.static('public'));
 
 let waitingQueue = [];
 const MAX_CONNECTIONS = 1000;
-const messageRateLimit = new Map(); // 訊息速率限制記錄
+const messageRateLimit = new Map();
 
-// 2026 時事熱話庫（可隨時修改）
+// ✅ 新增：閒置斷線時間 (5分鐘 = 300000 毫秒)
+const IDLE_TIMEOUT = 5 * 60 * 1000;
+
 const allTopics = [
-    "🥢 邊度有好嘢食？",
-    "💼 今晚收幾點？",
-    "🎬 有冇好戲推介？",
-    "⚽ 點睇琴晚場波？",
-    "🎮 打機組隊？",
-    "☕ 邊度咖啡好飲？",
-    "📸 近排邊度打卡正？"];
+    "🥢 邊度有好嘢食？", "💼 今晚收幾點？", "🎬 有冇好戲推介？",
+    "⚽ 點睇琴晚場波？", "🎮 打機組隊？", "☕ 邊度咖啡好飲？", "📸 近排邊度打卡正？"
+];
 
-// 隨機抽選 3 個話題
 function getRandomTopics(count = 3) {
     const shuffled = [...allTopics].sort(() => 0.5 - Math.random());
     return shuffled.slice(0, count);
 }
 
-// 健康檢查接口
+// ✅ 新增：重置閒置計時器函式
+function resetIdleTimer(socket) {
+    if (socket.idleTimer) clearTimeout(socket.idleTimer);
+    
+    // 只有在已經配對的狀態下才需要倒數
+    if (socket.roomId) {
+        socket.idleTimer = setTimeout(() => {
+            // 時間到，強制斷線
+            if (socket.roomId) {
+                io.to(socket.roomId).emit('partner_left', { msg: '對方因太耐冇講嘢而被系統踢出' });
+                socket.emit('error', { msg: '因為閒置太耐，連線已結束' });
+                
+                // 執行離開房間邏輯
+                const roomId = socket.roomId;
+                cleanupRoom(roomId);
+            }
+        }, IDLE_TIMEOUT);
+    }
+}
+
 app.get('/health', (req, res) => {
     res.json({
         status: 'ok',
         online: io.sockets.sockets.size,
         waiting: waitingQueue.length,
-        rooms: Array.from(io.sockets.adapter.rooms.keys())
-            .filter(r => r.startsWith('room_')).length,
+        rooms: Array.from(io.sockets.adapter.rooms.keys()).filter(r => r.startsWith('room_')).length,
         timestamp: new Date().toISOString()
     });
 });
 
 io.on('connection', (socket) => {
-    // 總連線數限制
     if (io.sockets.sockets.size > MAX_CONNECTIONS) {
         socket.emit('error', { msg: '伺服器繁忙，請稍後再試' });
         socket.disconnect(true);
         return;
     }
 
-    console.log(`👤 用戶連線: ${socket.id} (總數: ${io.sockets.sockets.size})`);
+    console.log(`👤 用戶連線: ${socket.id}`);
 
     socket.on('start_chat', () => {
-        // 防止重複加入排隊
-        if (waitingQueue.includes(socket.id)) {
-            socket.emit('error', { msg: '你已經在等候隊列中' });
-            return;
-        }
-        
-        // 防止已在聊天中卻重新開始
+        // 清除舊狀態
         if (socket.roomId) {
-            socket.emit('error', { msg: '你已經在聊天中，請先結束當前對話' });
-            return;
+            socket.leave(socket.roomId);
+            socket.roomId = null;
         }
         
+        if (waitingQueue.includes(socket.id)) return;
+
         if (waitingQueue.length > 0) {
             const partnerId = waitingQueue.shift();
             const partnerSocket = io.sockets.sockets.get(partnerId);
@@ -79,41 +92,33 @@ io.on('connection', (socket) => {
                 socket.roomId = roomId;
                 partnerSocket.roomId = roomId;
                 
-                // 清除排隊超時計時器
+                // 清除排隊超時
                 if (socket.queueTimeout) { clearTimeout(socket.queueTimeout); socket.queueTimeout = null; }
                 if (partnerSocket.queueTimeout) { clearTimeout(partnerSocket.queueTimeout); partnerSocket.queueTimeout = null; }
                 
+                // ✅ 配對成功，雙方啟動閒置計時器
+                resetIdleTimer(socket);
+                resetIdleTimer(partnerSocket);
+
+                io.to(roomId).emit('matched', { roomId, topics: getRandomTopics() });
                 console.log(`✅ 配對成功: ${roomId}`);
-                
-                // 發送配對成功訊息與隨機話題
-                io.to(roomId).emit('matched', { 
-                    roomId, 
-                    topics: getRandomTopics() 
-                });
             } else {
-                // 如果取出的人已經斷線或出錯，重新將自己加入隊列
                 waitingQueue.push(socket.id);
                 socket.emit('waiting', { msg: '搵緊聊天對象...' });
             }
         } else {
             waitingQueue.push(socket.id);
             socket.emit('waiting', { msg: '搵緊聊天對象...' });
-            console.log(`⏳ ${socket.id} 加入隊列，當前等候: ${waitingQueue.length} 人`);
             
-            // 30 秒後若還沒配對到，發送提醒
             socket.queueTimeout = setTimeout(() => {
                 if (waitingQueue.includes(socket.id)) {
-                    socket.emit('queue_timeout', {
-                        msg: '等緊人配對中...再等陣啦',
-                        waitingCount: waitingQueue.length
-                    });
+                    socket.emit('queue_timeout', { msg: '等緊人配對中...再等陣啦', waitingCount: waitingQueue.length });
                 }
             }, 30000);
         }
     });
 
     socket.on('send_msg', (data) => {
-        // 速率限制：每秒最多 5 則訊息
         const now = Date.now();
         const userMessages = messageRateLimit.get(socket.id) || [];
         const recentMessages = userMessages.filter(time => now - time < 1000);
@@ -126,38 +131,31 @@ io.on('connection', (socket) => {
         recentMessages.push(now);
         messageRateLimit.set(socket.id, recentMessages);
         
-        // 訊息合法性檢查
         if (!data || !data.msg || typeof data.msg !== 'string') return;
-        
         const cleanMsg = data.msg.trim();
         if (cleanMsg.length === 0 || cleanMsg.length > 1000) return;
         
-        // 轉發訊息
         if (socket.roomId && socket.roomId === data.roomId) {
-            socket.to(data.roomId).emit('receive_msg', {
-                msg: cleanMsg,
-                timestamp: Date.now()
-            });
+            socket.to(data.roomId).emit('receive_msg', { msg: cleanMsg });
+            
+            // ✅ 有傳訊息，重置雙方的閒置計時器 (因為代表這個房間還活躍)
+            // 這樣可以避免「對方一直講話，但我只是聽，結果我被踢」的情況
+            const room = io.sockets.adapter.rooms.get(socket.roomId);
+            if (room) {
+                room.forEach(sid => {
+                    const s = io.sockets.sockets.get(sid);
+                    if (s) resetIdleTimer(s);
+                });
+            }
         }
     });
 
-    // 打字與已讀狀態轉發
-    socket.on('typing', () => {
-        if (socket.roomId) socket.to(socket.roomId).emit('partner_typing');
-    });
+    socket.on('typing', () => { if (socket.roomId) socket.to(socket.roomId).emit('partner_typing'); });
+    socket.on('stop_typing', () => { if (socket.roomId) socket.to(socket.roomId).emit('partner_stop_typing'); });
+    socket.on('msg_read', () => { if (socket.roomId) socket.to(socket.roomId).emit('partner_read'); });
 
-    socket.on('stop_typing', () => {
-        if (socket.roomId) socket.to(socket.roomId).emit('partner_stop_typing');
-    });
-
-    socket.on('msg_read', () => {
-        if (socket.roomId) socket.to(socket.roomId).emit('partner_read');
-    });
-
-    // 主動結束對話
     socket.on('end_chat', () => {
         if (!socket.roomId) return;
-        
         const roomId = socket.roomId;
         socket.to(roomId).emit('partner_left', { msg: '對方已離開' });
         cleanupRoom(roomId);
@@ -165,11 +163,12 @@ io.on('connection', (socket) => {
     });
 
     socket.on('disconnect', () => {
-        console.log(`❌ 用戶斷線: ${socket.id}`);
-        messageRateLimit.delete(socket.id); // 清理速率限制紀錄
-        waitingQueue = waitingQueue.filter(id => id !== socket.id);
+        // ✅ 斷線時清除計時器
+        if (socket.idleTimer) clearTimeout(socket.idleTimer);
         
-        if (socket.queueTimeout) { clearTimeout(socket.queueTimeout); }
+        messageRateLimit.delete(socket.id);
+        waitingQueue = waitingQueue.filter(id => id !== socket.id);
+        if (socket.queueTimeout) clearTimeout(socket.queueTimeout);
         
         if (socket.roomId) {
             socket.to(socket.roomId).emit('partner_left', { msg: '對方已離開' });
@@ -178,7 +177,6 @@ io.on('connection', (socket) => {
     });
 });
 
-// 清理房間邏輯
 function cleanupRoom(roomId) {
     try {
         const room = io.sockets.adapter.rooms.get(roomId);
@@ -186,6 +184,8 @@ function cleanupRoom(roomId) {
             room.forEach(socketId => {
                 const s = io.sockets.sockets.get(socketId);
                 if (s) {
+                    // ✅ 離開房間時，也要清除計時器
+                    if (s.idleTimer) { clearTimeout(s.idleTimer); s.idleTimer = null; }
                     s.leave(roomId);
                     s.roomId = null;
                 }
@@ -196,7 +196,6 @@ function cleanupRoom(roomId) {
     }
 }
 
-// 定期清理速率限制紀錄（每 5 分鐘）
 setInterval(() => {
     const now = Date.now();
     for (const [id, times] of messageRateLimit.entries()) {
@@ -205,15 +204,6 @@ setInterval(() => {
         }
     }
 }, 300000);
-
-// 每分鐘在後台 Log 打印統計數據
-setInterval(() => {
-    console.log('📊 當前統計:', {
-        在線: io.sockets.sockets.size,
-        等待隊列: waitingQueue.length,
-        活躍房間: Array.from(io.sockets.adapter.rooms.keys()).filter(r => r.startsWith('room_')).length
-    });
-}, 60000);
 
 const PORT = process.env.PORT || 3000;
 http.listen(PORT, '0.0.0.0', () => {
