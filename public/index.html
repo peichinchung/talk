@@ -25,12 +25,9 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
             margin: 0; 
             background: var(--bg-color); 
-            height: 100vh; 
-            height: 100dvh; 
-            display: flex; 
-            color: var(--text-white); 
-            overflow: hidden; 
-            overscroll-behavior: none; 
+            height: 100vh; height: 100dvh; 
+            display: flex; color: var(--text-white); 
+            overflow: hidden; overscroll-behavior: none; 
         }
         
         #sidebar { width: 260px; background: var(--sidebar-bg); border-right: 1px solid rgba(0,0,0,0.2); display: flex; flex-direction: column; transition: 0.3s ease; z-index: 2000; }
@@ -42,29 +39,20 @@
         #main-container { flex: 1; display: flex; flex-direction: column; position: relative; transition: 0.3s; width: 100%; height: 100%; }
         header { background: var(--header-color); padding: 15px; display: flex; align-items: center; justify-content: space-between; font-weight: bold; flex-shrink: 0; }
         
-        #chat-box { 
-            flex: 1; 
-            overflow-y: auto; 
-            padding: 20px; 
-            display: flex; 
-            flex-direction: column; 
-            gap: 12px; 
-            -webkit-overflow-scrolling: touch; 
-            scroll-behavior: smooth;
+        /* ✅ 新增：連線狀態提示條 */
+        #status-bar {
+            display: none;
+            background: #e6b800;
+            color: #333;
+            font-size: 12px;
+            text-align: center;
+            padding: 4px;
+            font-weight: bold;
         }
+
+        #chat-box { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }
         
-        .joke-fade {
-            animation: fadeIn 0.8s ease-in-out;
-            background: rgba(160, 139, 171, 0.15) !important;
-            border-left: 4px solid var(--accent-color);
-            border-radius: 8px;
-            padding: 12px 16px !important;
-            max-width: 85%;
-            margin: 15px auto !important;
-            box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
-            text-align: left;
-            line-height: 1.6;
-        }
+        .joke-fade { animation: fadeIn 0.8s ease-in-out; background: rgba(160, 139, 171, 0.15) !important; border-left: 4px solid var(--accent-color); border-radius: 8px; padding: 12px 16px !important; max-width: 85%; margin: 15px auto !important; box-shadow: 2px 2px 10px rgba(0,0,0,0.1); text-align: left; line-height: 1.6; }
         .joke-fade small { color: var(--accent-color); font-weight: bold; font-size: 11px; }
 
         .suggestion-container { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 10px 0; }
@@ -85,14 +73,7 @@
         #end-btn { background: rgba(220, 60, 60, 0.9); border: none; color: white; font-weight: bold; padding: 0 16px; margin-right: 8px; border-radius: 25px; cursor: pointer; font-size: 14px; transition: 0.2s; flex-shrink: 0; min-width: 50px; }
         #end-btn:active { background: rgba(200, 40, 40, 1); transform: scale(0.95); }
 
-        #input-area { 
-            background: var(--header-color); 
-            padding: 10px; 
-            display: flex; 
-            gap: 8px; 
-            padding-bottom: calc(10px + env(safe-area-inset-bottom)); 
-            flex-shrink: 0; 
-        }
+        #input-area { background: var(--header-color); padding: 10px; display: flex; gap: 8px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); flex-shrink: 0; }
         input { flex: 1; border: none; background: rgba(255,255,255,0.15); padding: 12px 16px; border-radius: 25px; color: white; outline: none; font-size: 16px; min-width: 0; }
         button#btn { background: var(--accent-color); border: none; color: white; font-weight: bold; padding: 0 20px; border-radius: 25px; cursor: pointer; flex-shrink: 0; min-width: 60px; }
         button#btn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -135,6 +116,8 @@
             暖港野 HA TALK
             <span style="width:50px;"></span>
         </header>
+
+        <div id="status-bar">⚠️ 網絡不穩，嘗試重連中...</div>
         
         <div id="chat-box"></div>
         <div id="typing-status"></div>
@@ -150,10 +133,13 @@
     <script>
         const socket = io({
             reconnection: true, 
-            reconnectionAttempts: 5
+            reconnectionAttempts: 10,
+            reconnectionDelay: 1000,
         });
         
         const notificationSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+        const statusBar = document.getElementById('status-bar');
+        
         let originalTitle = document.title;
         let flashInterval = null;
 
@@ -209,14 +195,12 @@
         function toggleSidebar(e) { e.stopPropagation(); document.getElementById('sidebar').classList.toggle('open'); }
         function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); }
 
-        // ✅ 修改邏輯：一按同意，如果已連線，直接開始配對
         function agreeDisclaimer() {
             document.getElementById('disclaimer-modal').style.display = 'none';
             if (socket.connected) {
-                startSearch(); // 直接開始！
+                startSearch(); 
             } else {
                 mainBtn.innerText = '連線中...';
-                // 設定一個 flag，等等連上時會自動開始
                 socket.autoStart = true;
             }
         }
@@ -326,6 +310,10 @@
         socket.on('partner_typing', () => { typingStatus.innerText = '對方諗緊點覆你...'; });
         socket.on('partner_stop_typing', () => { typingStatus.innerText = ''; });
 
+        socket.on('partner_status', (data) => {
+            typingStatus.innerText = data.msg;
+        });
+
         socket.on('partner_left', (data) => {
             if (waitTimer) clearInterval(waitTimer);
             addSystemMsg(data.msg || '對方走咗喇。');
@@ -383,15 +371,19 @@
 
         msgInput.addEventListener("keypress", (e) => { if (e.key === "Enter" && !msgInput.disabled) handleAction(); });
 
+        // ✅ 關鍵修正：處理手機背景斷線問題
         socket.on('disconnect', (reason) => {
             if (waitTimer) clearInterval(waitTimer);
             
-            let msg = '⚠️ 連線中斷，請檢查網絡';
-            if (reason === "io server disconnect") {
-                msg = '⚠️ 連線已逾時，請重新載入';
+            // 如果是「意外斷線」 (手機切換 App / 網絡不穩)，不要殺死 UI
+            if (reason === "transport close" || reason === "ping timeout") {
+                statusBar.style.display = 'block'; // 顯示黃色提示條
+                // 不鎖死按鈕，不顯示紅色錯誤，讓 Socket.io 自動重連
+                return;
             }
             
-            addSystemMsg(msg);
+            // 如果是伺服器踢的 (io server disconnect)，才顯示錯誤
+            addSystemMsg('⚠️ 連線已逾時或中斷');
             mainBtn.innerText = '重新載入';
             mainBtn.disabled = false;
             mainBtn.dataset.action = 'reload'; 
@@ -399,10 +391,12 @@
         });
 
         socket.on('connect', () => {
-            // ✅ 如果之前標記了 autoStart，連上後馬上開始
+            // 連線成功，隱藏黃色提示條
+            statusBar.style.display = 'none';
+
             if (socket.autoStart) {
                 startSearch();
-                delete socket.autoStart; // 用完就刪除
+                delete socket.autoStart; 
             } 
             else if (mainBtn.dataset.action === 'reload') {
                 addSystemMsg('✅ 網絡已恢復，可以重新開始配對');
@@ -417,7 +411,7 @@
             if (document.visibilityState === 'visible') {
                 stopTitleFlash(); 
                 if (!socket.connected) {
-                    addSystemMsg('🔄 嘗試重新連線中...');
+                    statusBar.style.display = 'block'; // 顯示嘗試重連
                     socket.connect();
                 }
             }
