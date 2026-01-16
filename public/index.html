@@ -11,47 +11,6 @@
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
       gtag('config', 'G-03QD2SY1QM');
-      // 1. 定義音效 (找一個短促的提示音連結)
-const notificationSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-
-// 2. 處理網頁標題閃爍
-let originalTitle = document.title;
-let flashInterval = null;
-
-function startTitleFlash() {
-    if (flashInterval) return;
-    let isOriginal = true;
-    flashInterval = setInterval(() => {
-        document.title = isOriginal ? "🔔 你有新訊息！" : originalTitle;
-        isOriginal = !isOriginal;
-    }, 1000);
-}
-
-function stopTitleFlash() {
-    if (flashInterval) {
-        clearInterval(flashInterval);
-        flashInterval = null;
-        document.title = originalTitle;
-    }
-}
-
-// 3. 修改 receive_msg
-socket.on('receive_msg', (data) => {
-    // ... 原本的邏輯 ...
-    
-    // 如果網頁在背景 (不可見)，就播放聲音 + 閃爍標題
-    if (document.hidden) {
-        notificationSound.play().catch(e => console.log('瀏覽器阻擋自動播放'));
-        startTitleFlash();
-    }
-});
-
-// 4. 當用戶回到網頁時，停止閃爍
-document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-        stopTitleFlash();
-    }
-});
     </script>
 
     <style>
@@ -62,17 +21,16 @@ document.addEventListener('visibilitychange', () => {
             --sidebar-bg: #4a4542;
         }
         
-        /* 針對手機瀏覽器的核心優化 */
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
             margin: 0; 
             background: var(--bg-color); 
-            height: 100vh; /* 相容舊瀏覽器 */
-            height: 100dvh; /* ✅ 解決 iOS 網址列伸縮問題 */
+            height: 100vh; 
+            height: 100dvh; 
             display: flex; 
             color: var(--text-white); 
-            overflow: hidden; /* 防止整個頁面被拖動 */
-            overscroll-behavior: none; /* ✅ 禁止 iOS 彈性拉動背景 */
+            overflow: hidden; 
+            overscroll-behavior: none; 
         }
         
         #sidebar { width: 260px; background: var(--sidebar-bg); border-right: 1px solid rgba(0,0,0,0.2); display: flex; flex-direction: column; transition: 0.3s ease; z-index: 2000; }
@@ -84,7 +42,6 @@ document.addEventListener('visibilitychange', () => {
         #main-container { flex: 1; display: flex; flex-direction: column; position: relative; transition: 0.3s; width: 100%; height: 100%; }
         header { background: var(--header-color); padding: 15px; display: flex; align-items: center; justify-content: space-between; font-weight: bold; flex-shrink: 0; }
         
-        /* ✅ 聊天區域優化：開啟硬體加速與慣性捲動 */
         #chat-box { 
             flex: 1; 
             overflow-y: auto; 
@@ -92,11 +49,10 @@ document.addEventListener('visibilitychange', () => {
             display: flex; 
             flex-direction: column; 
             gap: 12px; 
-            -webkit-overflow-scrolling: touch; /* ✅ iOS 關鍵：讓滑動有慣性，不卡頓 */
+            -webkit-overflow-scrolling: touch; 
             scroll-behavior: smooth;
         }
         
-        /* 笑話卡片 */
         .joke-fade {
             animation: fadeIn 0.8s ease-in-out;
             background: rgba(160, 139, 171, 0.15) !important;
@@ -129,13 +85,12 @@ document.addEventListener('visibilitychange', () => {
         #end-btn { background: rgba(220, 60, 60, 0.9); border: none; color: white; font-weight: bold; padding: 0 16px; margin-right: 8px; border-radius: 25px; cursor: pointer; font-size: 14px; transition: 0.2s; flex-shrink: 0; min-width: 50px; }
         #end-btn:active { background: rgba(200, 40, 40, 1); transform: scale(0.95); }
 
-        /* ✅ 輸入區域優化：適配 iPhone 底部橫條 */
         #input-area { 
             background: var(--header-color); 
             padding: 10px; 
             display: flex; 
             gap: 8px; 
-            padding-bottom: calc(10px + env(safe-area-inset-bottom)); /* 適配 iPhone X+ */
+            padding-bottom: calc(10px + env(safe-area-inset-bottom)); 
             flex-shrink: 0; 
         }
         input { flex: 1; border: none; background: rgba(255,255,255,0.15); padding: 12px 16px; border-radius: 25px; color: white; outline: none; font-size: 16px; min-width: 0; }
@@ -193,11 +148,35 @@ document.addEventListener('visibilitychange', () => {
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
+        // ✅ 修正：所有主邏輯都放在這裡
         const socket = io({
-            reconnection: true, // 允許自動重連
+            reconnection: true, 
             reconnectionAttempts: 5
         });
         
+        // --- 🔔 聲音與標題閃爍設定區 (已搬移到正確位置) ---
+        const notificationSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+        let originalTitle = document.title;
+        let flashInterval = null;
+
+        function startTitleFlash() {
+            if (flashInterval) return;
+            let isOriginal = true;
+            flashInterval = setInterval(() => {
+                document.title = isOriginal ? "🔔 你有新訊息！" : originalTitle;
+                isOriginal = !isOriginal;
+            }, 1000);
+        }
+
+        function stopTitleFlash() {
+            if (flashInterval) {
+                clearInterval(flashInterval);
+                flashInterval = null;
+                document.title = originalTitle;
+            }
+        }
+        // ----------------------------------------------------
+
         let currentRoom = null;
         let typingTimeout = null;
         let waitTimer = null; 
@@ -234,23 +213,20 @@ document.addEventListener('visibilitychange', () => {
         function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); }
 
         function agreeDisclaimer() {
-            document.getElementById('disclaimer-modal').style.display = 'none';
-            // 如果 socket 已經連上，直接開始；如果未連上，等 connect 事件
-            if (socket.connected) {
-                // 不自動開始，讓用戶自己點，體驗比較好
-                mainBtn.disabled = false;
-            } else {
-                mainBtn.innerText = '連線中...';
-            }
-        }
+    document.getElementById('disclaimer-modal').style.display = 'none';
+    if (socket.connected) {
+        // 👇 目前是這樣：只解鎖按鈕，不自動開始
+        mainBtn.disabled = false; 
+    } else {
+        mainBtn.innerText = '連線中...';
+    }
+}
 
         function handleAction() {
-            // 如果按鈕是用來重新載入的
             if (mainBtn.dataset.action === 'reload') {
                 window.location.reload();
                 return;
             }
-            
             if (!currentRoom) startSearch();
             else sendMsg();
         }
@@ -310,7 +286,6 @@ document.addEventListener('visibilitychange', () => {
             msgInput.focus();
             mainBtn.innerText = '傳送';
             mainBtn.disabled = false;
-            // 防止鍵盤彈出遮擋
             setTimeout(() => { chatBox.scrollTop = chatBox.scrollHeight; }, 300);
         });
 
@@ -337,6 +312,12 @@ document.addEventListener('visibilitychange', () => {
             const text = typeof data === 'string' ? data : data.msg;
             addMsg(text, 'partner');
             socket.emit('msg_read', { roomId: currentRoom });
+            
+            // ✅ 聲音與閃爍邏輯整併到這裡
+            if (document.hidden) {
+                notificationSound.play().catch(e => console.log('瀏覽器阻擋自動播放'));
+                startTitleFlash();
+            }
         });
 
         socket.on('partner_read', () => {
@@ -350,6 +331,15 @@ document.addEventListener('visibilitychange', () => {
         socket.on('partner_left', (data) => {
             if (waitTimer) clearInterval(waitTimer);
             addSystemMsg(data.msg || '對方走咗喇。');
+            
+            // 加入離開後的重試按鈕
+            const btnDiv = document.createElement('div');
+            btnDiv.style.textAlign = 'center';
+            btnDiv.style.margin = '20px 0';
+            btnDiv.innerHTML = `<button onclick="startSearch()" style="background:var(--accent-color); color:white; border:none; padding:12px 24px; border-radius:25px; font-weight:bold; box-shadow:0 4px 10px rgba(0,0,0,0.2);">🔄 尋找下一個</button>`;
+            chatBox.appendChild(btnDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
             resetToIdle();
         });
 
@@ -360,7 +350,7 @@ document.addEventListener('visibilitychange', () => {
             msgInput.value = '';
             mainBtn.innerText = '開始';
             mainBtn.disabled = false;
-            mainBtn.dataset.action = ''; // 重置按鈕動作
+            mainBtn.dataset.action = ''; 
             typingStatus.innerText = '';
             removeEndChatButton();
         }
@@ -396,27 +386,22 @@ document.addEventListener('visibilitychange', () => {
 
         msgInput.addEventListener("keypress", (e) => { if (e.key === "Enter" && !msgInput.disabled) handleAction(); });
 
-        // ✅ 新增：斷線處理邏輯
         socket.on('disconnect', (reason) => {
             if (waitTimer) clearInterval(waitTimer);
             
-            // 判斷是否為伺服器主動踢出 (io server disconnect) 或傳輸問題 (transport close)
             let msg = '⚠️ 連線中斷，請檢查網絡';
             if (reason === "io server disconnect") {
                 msg = '⚠️ 連線已逾時，請重新載入';
             }
             
             addSystemMsg(msg);
-            
-            // 將按鈕改為「重新載入」模式
             mainBtn.innerText = '重新載入';
             mainBtn.disabled = false;
-            mainBtn.dataset.action = 'reload'; // 標記按鈕行為
+            mainBtn.dataset.action = 'reload'; 
             msgInput.blur();
         });
 
         socket.on('connect', () => {
-            // 如果本來是顯示「重新載入」，現在連上了，就提示用戶可以開始
             if (mainBtn.dataset.action === 'reload') {
                 addSystemMsg('✅ 網絡已恢復，可以重新開始配對');
                 resetToIdle();
@@ -426,9 +411,10 @@ document.addEventListener('visibilitychange', () => {
             }
         });
 
-        // ✅ 新增：頁面可見性偵測 (處理手機鎖屏後回來的狀況)
+        // 停止閃爍的監聽器
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
+                stopTitleFlash(); // 停止閃爍
                 if (!socket.connected) {
                     addSystemMsg('🔄 嘗試重新連線中...');
                     socket.connect();
