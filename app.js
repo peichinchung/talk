@@ -7,14 +7,13 @@ const io = require('socket.io')(http, {
         methods: ["GET", "POST"],
         credentials: true
     },
-    // ✅ 啟用連線狀態恢復 (Connection State Recovery)
-    // 這是 Socket.io V4.6+ 的新功能，專門解決手機斷線問題
     connectionStateRecovery: {
-        maxDisconnectionDuration: 2 * 60 * 1000, // 2分鐘內回來都算同一個人
+        maxDisconnectionDuration: 5 * 60 * 1000, // ✅ 延長到 5 分鐘
         skipMiddlewares: true,
     },
-    pingTimeout: 60000, 
-    pingInterval: 25000 
+    pingTimeout: 90000, // ✅ 延長到 90 秒
+    pingInterval: 25000,
+    transports: ['websocket', 'polling'] // ✅ 確保支援多種傳輸方式
 });
 
 app.use(express.static('public'));
@@ -22,8 +21,6 @@ app.use(express.static('public'));
 let waitingQueue = [];
 const MAX_CONNECTIONS = 1000;
 const messageRateLimit = new Map();
-
-// 用來記錄房間的「銷毀倒數計時器」
 const roomDestructionTimers = new Map();
 
 const allTopics = [
@@ -53,20 +50,20 @@ io.on('connection', (socket) => {
         return;
     }
 
-    // ✅ 檢查是否為「恢復連線」的用戶
     if (socket.recovered) {
-        console.log(`♻️ 用戶恢復連線: ${socket.id} (Room: ${socket.roomId})`);
+        console.log(`♻️ 用戶恢復連線: ${socket.id} (Room: ${socket.roomId || socket.data.roomId})`);
         
-        // 如果這個房間原本在「倒數銷毀中」，現在有人回來了，就取消倒數！
-        if (socket.roomId && roomDestructionTimers.has(socket.roomId)) {
-            clearTimeout(roomDestructionTimers.get(socket.roomId));
-            roomDestructionTimers.delete(socket.roomId);
-            console.log(`🛡️ 房間 ${socket.roomId} 銷毀倒數已取消`);
+        const recoveredRoom = socket.roomId || socket.data.roomId;
+        if (recoveredRoom && roomDestructionTimers.has(recoveredRoom)) {
+            clearTimeout(roomDestructionTimers.get(recoveredRoom));
+            roomDestructionTimers.delete(recoveredRoom);
+            console.log(`🛡️ 房間 ${recoveredRoom} 銷毀倒數已取消`);
             
-            // 通知房間裡的其他人：我也回來了
-            socket.to(socket.roomId).emit('partner_status', { status: 'online', msg: '對方已重新連線' });
+            // ✅ 通知雙方：連線已恢復
+            socket.emit('connection_recovered', { roomId: recoveredRoom });
+            socket.to(recoveredRoom).emit('partner_status', { status: 'online', msg: '對方已重新連線' });
         }
-        return; // 恢復連線者不需要重跑下面的初始化邏輯
+        return;
     }
 
     console.log(`👤 新用戶連線: ${socket.id}`);
@@ -75,6 +72,7 @@ io.on('connection', (socket) => {
         if (socket.roomId) {
             socket.leave(socket.roomId);
             socket.roomId = null;
+            socket.data.roomId = null;
         }
         
         if (waitingQueue.includes(socket.id)) return;
@@ -88,7 +86,6 @@ io.on('connection', (socket) => {
                 socket.join(roomId);
                 partnerSocket.join(roomId);
                 
-                // 設定 Socket 資料，方便斷線恢復時辨識
                 socket.data.roomId = roomId;
                 partnerSocket.data.roomId = roomId;
                 socket.roomId = roomId;
@@ -132,7 +129,6 @@ io.on('connection', (socket) => {
         const cleanMsg = data.msg.trim();
         if (cleanMsg.length === 0 || cleanMsg.length > 1000) return;
         
-        // 使用 socket.data.roomId 以支援恢復
         const currentRoom = socket.roomId || socket.data.roomId;
         if (currentRoom && currentRoom === data.roomId) {
             socket.to(data.roomId).emit('receive_msg', { msg: cleanMsg });
@@ -169,18 +165,16 @@ io.on('connection', (socket) => {
         
         const r = socket.roomId || socket.data.roomId;
         
-        // ✅ 關鍵修改：如果是意外斷線 (transport close)，不要馬上清理房間
+        // ✅ 延長寬限期到 2 分鐘，給手機更多時間恢復
         if (r) {
-            // 通知對方：他斷線了，但可能等等回來
             socket.to(r).emit('partner_status', { status: 'offline', msg: '對方連線不穩，等待重連中...' });
 
-            // 設定 60 秒倒數，如果 60 秒內沒連回來，才真的清理房間
             if (!roomDestructionTimers.has(r)) {
                 const timer = setTimeout(() => {
                     io.to(r).emit('partner_left', { msg: '對方已斷線離開' });
                     cleanupRoom(r);
                     roomDestructionTimers.delete(r);
-                }, 60000); // 60秒寬限期
+                }, 120000); // ✅ 2 分鐘寬限期
                 roomDestructionTimers.set(r, timer);
             }
         }
