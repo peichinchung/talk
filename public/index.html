@@ -148,13 +148,11 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        // ✅ 修正：所有主邏輯都放在這裡
         const socket = io({
             reconnection: true, 
             reconnectionAttempts: 5
         });
         
-        // --- 🔔 聲音與標題閃爍設定區 (已搬移到正確位置) ---
         const notificationSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
         let originalTitle = document.title;
         let flashInterval = null;
@@ -175,7 +173,6 @@
                 document.title = originalTitle;
             }
         }
-        // ----------------------------------------------------
 
         let currentRoom = null;
         let typingTimeout = null;
@@ -212,15 +209,17 @@
         function toggleSidebar(e) { e.stopPropagation(); document.getElementById('sidebar').classList.toggle('open'); }
         function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); }
 
+        // ✅ 修改邏輯：一按同意，如果已連線，直接開始配對
         function agreeDisclaimer() {
-    document.getElementById('disclaimer-modal').style.display = 'none';
-    if (socket.connected) {
-        // 👇 目前是這樣：只解鎖按鈕，不自動開始
-        mainBtn.disabled = false; 
-    } else {
-        mainBtn.innerText = '連線中...';
-    }
-}
+            document.getElementById('disclaimer-modal').style.display = 'none';
+            if (socket.connected) {
+                startSearch(); // 直接開始！
+            } else {
+                mainBtn.innerText = '連線中...';
+                // 設定一個 flag，等等連上時會自動開始
+                socket.autoStart = true;
+            }
+        }
 
         function handleAction() {
             if (mainBtn.dataset.action === 'reload') {
@@ -313,7 +312,6 @@
             addMsg(text, 'partner');
             socket.emit('msg_read', { roomId: currentRoom });
             
-            // ✅ 聲音與閃爍邏輯整併到這裡
             if (document.hidden) {
                 notificationSound.play().catch(e => console.log('瀏覽器阻擋自動播放'));
                 startTitleFlash();
@@ -332,7 +330,6 @@
             if (waitTimer) clearInterval(waitTimer);
             addSystemMsg(data.msg || '對方走咗喇。');
             
-            // 加入離開後的重試按鈕
             const btnDiv = document.createElement('div');
             btnDiv.style.textAlign = 'center';
             btnDiv.style.margin = '20px 0';
@@ -402,7 +399,12 @@
         });
 
         socket.on('connect', () => {
-            if (mainBtn.dataset.action === 'reload') {
+            // ✅ 如果之前標記了 autoStart，連上後馬上開始
+            if (socket.autoStart) {
+                startSearch();
+                delete socket.autoStart; // 用完就刪除
+            } 
+            else if (mainBtn.dataset.action === 'reload') {
                 addSystemMsg('✅ 網絡已恢復，可以重新開始配對');
                 resetToIdle();
             } else if (mainBtn.disabled && mainBtn.innerText === '連線中...') {
@@ -411,10 +413,9 @@
             }
         });
 
-        // 停止閃爍的監聽器
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
-                stopTitleFlash(); // 停止閃爍
+                stopTitleFlash(); 
                 if (!socket.connected) {
                     addSystemMsg('🔄 嘗試重新連線中...');
                     socket.connect();
