@@ -103,6 +103,12 @@ io.on('connection', (socket) => {
                     const partnerSocket = io.sockets.sockets.get(partnerSession?.socketId);
                     
                     if (partnerSocket?.connected) {
+                        // 🔧 FIX: 清除對方可能還在等待的 softDisconnectTimer
+                        if (partnerSession?.softDisconnectTimer) {
+                            clearTimeout(partnerSession.softDisconnectTimer);
+                            partnerSession.softDisconnectTimer = null;
+                        }
+                        
                         socket.to(session.roomId).emit('partner_status', { 
                             status: 'online', 
                             msg: '對方已重新連線 ✅' 
@@ -136,7 +142,7 @@ io.on('connection', (socket) => {
 
     // --- 配對邏輯 (完整加強版) ---
     socket.on('start_chat', () => {
-        const session = userSessions.get(userId);
+        let session = userSessions.get(userId); // 🔧 FIX: 改用 let 以便重新取得
         
         if (!session) {
             socket.emit('error', { msg: '會話無效，請重新整理' });
@@ -149,6 +155,7 @@ io.on('connection', (socket) => {
                 msg: '對方已離開尋找新對象' 
             });
             leaveRoom(userId, session.roomId);
+            session = userSessions.get(userId); // 🔧 FIX: 重新取得 session
         }
 
         // 清理自己在等待隊列的所有舊紀錄
@@ -242,11 +249,22 @@ io.on('connection', (socket) => {
     });
 
     // --- 發送訊息 ---
+    // 🔧 FIX: 加強檢查房間是否存在
     socket.on('send_msg', (data, callback) => {
         const session = userSessions.get(userId);
         
         if (!session || !session.roomId) {
             if (callback) callback({ status: 'error', msg: '你不在房間內' });
+            return;
+        }
+
+        // 🔧 FIX: 檢查房間是否還存在且有效
+        const roomUsers = rooms.get(session.roomId);
+        if (!roomUsers || roomUsers.size < 2) {
+            if (callback) callback({ status: 'error', msg: '對方已離開' });
+            // 清理自己的狀態
+            session.roomId = null;
+            socket.emit('partner_left', { msg: '對方已離開' });
             return;
         }
 
@@ -256,21 +274,28 @@ io.on('connection', (socket) => {
     });
 
     // --- 已讀回報 ---
+    // 🔧 FIX: 檢查房間是否存在
     socket.on('msg_read', () => {
         const session = userSessions.get(userId);
-        if (session?.roomId) {
+        if (session?.roomId && rooms.has(session.roomId)) {
             socket.to(session.roomId).emit('partner_read');
         }
     });
 
+    // 🔧 FIX: 檢查房間是否存在
     socket.on('typing', () => {
         const s = userSessions.get(userId);
-        if (s?.roomId) socket.to(s.roomId).emit('partner_typing');
+        if (s?.roomId && rooms.has(s.roomId)) {
+            socket.to(s.roomId).emit('partner_typing');
+        }
     });
 
+    // 🔧 FIX: 檢查房間是否存在
     socket.on('stop_typing', () => {
         const s = userSessions.get(userId);
-        if (s?.roomId) socket.to(s.roomId).emit('partner_stop_typing');
+        if (s?.roomId && rooms.has(s.roomId)) {
+            socket.to(s.roomId).emit('partner_stop_typing');
+        }
     });
 
     // --- 主動離開 ---
@@ -297,6 +322,7 @@ io.on('connection', (socket) => {
     });
 
     // --- 斷線處理 (最關鍵) ---
+    // 🔧 FIX: 加強 session 檢查
     socket.on('disconnect', (reason) => {
         console.log(`❌ 斷線: ${userId} (${reason})`);
         
@@ -305,17 +331,23 @@ io.on('connection', (socket) => {
 
         const session = userSessions.get(userId);
         
+        // 🔧 FIX: 如果 session 不存在直接返回
+        if (!session) {
+            console.warn(`⚠️ 斷線時找不到 session: ${userId}`);
+            return;
+        }
+        
         // 清理舊的 timer
-        if (session?.disconnectTimer) {
+        if (session.disconnectTimer) {
             clearTimeout(session.disconnectTimer);
             session.disconnectTimer = null;
         }
-        if (session?.softDisconnectTimer) {
+        if (session.softDisconnectTimer) {
             clearTimeout(session.softDisconnectTimer);
             session.softDisconnectTimer = null;
         }
 
-        if (session?.roomId) {
+        if (session.roomId) {
             // 先不通知，給 10 秒緩衝
             session.softDisconnectTimer = setTimeout(() => {
                 const currentSession = userSessions.get(userId);
@@ -354,20 +386,29 @@ io.on('connection', (socket) => {
     });
 });
 
+// 🔧 FIX: 完整修正 leaveRoom 函數
 function leaveRoom(userId, roomId) {
     const roomUsers = rooms.get(roomId);
     if (roomUsers) {
         roomUsers.delete(userId);
         
-        // 如果房間只剩一人，也清理他的狀態
+        // 如果房間只剩一人
         if (roomUsers.size === 1) {
             const remainingUser = Array.from(roomUsers)[0];
             const remainingSession = userSessions.get(remainingUser);
             if (remainingSession) {
                 remainingSession.roomId = null;
+                // 🔧 FIX: 讓剩餘用戶也離開房間
+                const remainingSocket = io.sockets.sockets.get(remainingSession.socketId);
+                if (remainingSocket) {
+                    remainingSocket.leave(roomId);
+                }
             }
+            // 🔧 FIX: 清理空房間
+            rooms.delete(roomId);
         }
         
+        // 如果房間完全空了
         if (roomUsers.size === 0) {
             rooms.delete(roomId);
         }

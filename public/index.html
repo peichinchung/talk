@@ -151,7 +151,8 @@
         // === 初始化 ===
         let myUserId = localStorage.getItem('ha_talk_uid');
         if (!myUserId) {
-            myUserId = 'u_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
+            // 🔧 FIX: 更好的 userId 生成，降低重複機率
+            myUserId = 'u_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9) + Math.random().toString(36).substr(2, 5);
             localStorage.setItem('ha_talk_uid', myUserId);
         }
 
@@ -160,6 +161,7 @@
             reconnection: true,
             reconnectionDelay: 1000,
             reconnectionDelayMax: 5000,
+            reconnectionAttempts: Infinity,
             timeout: 10000
         });
 
@@ -179,7 +181,9 @@
 
         const waitContent = [
             { type: "急口令", text: "入實驗室，撳緊急掣。" },
+            { type: "急口令", text: "郵差叔叔，送信純熟，迅速送出。" },
             { type: "爛gag", text: "點解小明跑得快過火車？<br>... 因為小明喺火車入面跑。" },
+            { type: "爛gag", text: "大明養小明，咁邊個養大明？<br>... 狗（因為「久」仰大明）" },
             { type: "冷知識", text: "原來廣東話有 9 個聲調：『詩史試時市事兒似寺』" },
             { type: "提醒", text: "匿名聊天雖然好玩，但記得都要尊重對方 ❤️" }
         ];
@@ -206,6 +210,12 @@
             if (isSearching) return;
             isSearching = true;
             currentRoom = null;
+            
+            // 🔧 FIX: 確保清理舊的 timer
+            if (waitTimer) {
+                clearInterval(waitTimer);
+                waitTimer = null;
+            }
             
             chatBox.innerHTML = '';
             addSystemMsg('🔍 正在為你搜尋對象...');
@@ -254,7 +264,7 @@
                     socket.emit('stop_typing');
                     removeTopicButtons();
                 } else {
-                    addSystemMsg('❌ 訊息傳送失敗');
+                    addSystemMsg('❌ ' + (response?.msg || '訊息傳送失敗'));
                 }
             });
         }
@@ -269,7 +279,12 @@
         function resetToIdle() {
             currentRoom = null;
             isSearching = false;
-            if (waitTimer) clearInterval(waitTimer);
+            
+            // 🔧 FIX: 確保清理 timer
+            if (waitTimer) {
+                clearInterval(waitTimer);
+                waitTimer = null;
+            }
             
             msgInput.disabled = true;
             msgInput.value = '';
@@ -282,7 +297,12 @@
             removeTopicButtons();
         }
 
+        // 🔧 FIX: 防止重複顯示按鈕
         function showRematchButton() {
+            // 先移除舊的按鈕
+            const oldBtn = document.querySelector('.rematch-container');
+            if (oldBtn) oldBtn.remove();
+            
             const div = document.createElement('div');
             div.className = 'rematch-container';
             div.innerHTML = `<button class="rematch-btn" onclick="startSearch()">🔄 找下一個</button>`;
@@ -312,10 +332,30 @@
             msgInput.disabled = true;
         });
 
+        // 🔧 FIX: 新增 error 事件監聽
+        socket.on('error', (data) => {
+            console.error('❌ Server error:', data);
+            addSystemMsg('❌ ' + (data.msg || '發生錯誤'));
+            
+            // 如果是嚴重錯誤（如 session 無效），建議重新整理
+            if (data.msg && data.msg.includes('重新整理')) {
+                setTimeout(() => {
+                    if (confirm('發生錯誤，是否重新整理頁面？')) {
+                        window.location.reload();
+                    }
+                }, 1000);
+            }
+        });
+
         socket.on('matched', (data) => {
             console.log('🎉 Matched:', data.roomId);
             isSearching = false;
-            if (waitTimer) clearInterval(waitTimer);
+            
+            // 🔧 FIX: 確保清理 timer
+            if (waitTimer) {
+                clearInterval(waitTimer);
+                waitTimer = null;
+            }
             
             currentRoom = data.roomId;
             chatBox.innerHTML = '';
@@ -337,11 +377,10 @@
         socket.on('receive_msg', (data) => {
             typingBubble.style.display = 'none';
             addMsg(data.msg, 'partner');
-            socket.emit('msg_read'); // 告訴對方已讀
+            socket.emit('msg_read');
         });
 
         socket.on('partner_read', () => {
-            // 標記最後一條訊息為已讀
             const myMsgs = document.querySelectorAll('.msg-wrapper.me .read-status');
             if (myMsgs.length > 0) {
                 const lastRead = myMsgs[myMsgs.length - 1];
@@ -352,6 +391,13 @@
 
         socket.on('partner_left', (data) => {
             console.log('👋 Partner left');
+            
+            // 🔧 FIX: 清理 timer
+            if (waitTimer) {
+                clearInterval(waitTimer);
+                waitTimer = null;
+            }
+            
             addSystemMsg(data.msg || '對方已離開');
             resetToIdle();
             showRematchButton();
@@ -359,16 +405,29 @@
 
         socket.on('chat_ended', (data) => {
             console.log('🔚 Chat ended');
+            
+            // 🔧 FIX: 清理 timer
+            if (waitTimer) {
+                clearInterval(waitTimer);
+                waitTimer = null;
+            }
+            
             addSystemMsg(data.msg || '對話已結束');
             resetToIdle();
             showRematchButton();
         });
 
-        // 🔄 重連恢復房間
         socket.on('connection_recovered', (data) => {
             console.log('🔄 Connection recovered:', data);
             currentRoom = data.roomId;
+            isSearching = false;
             statusBar.style.display = 'none';
+            
+            // 🔧 FIX: 清理可能還在運行的 timer
+            if (waitTimer) {
+                clearInterval(waitTimer);
+                waitTimer = null;
+            }
             
             addSystemMsg('✅ 網絡已恢復，回到對話中');
             
@@ -380,15 +439,20 @@
             typingTextStatus.innerText = '';
         });
 
-        // 🚪 房間已關閉
         socket.on('room_closed', (data) => {
             console.log('🚪 Room closed:', data);
+            
+            // 🔧 FIX: 清理 timer
+            if (waitTimer) {
+                clearInterval(waitTimer);
+                waitTimer = null;
+            }
+            
             addSystemMsg(data.msg || '房間已關閉');
             resetToIdle();
             showRematchButton();
         });
 
-        // 📡 對方狀態更新
         socket.on('partner_status', (data) => {
             typingTextStatus.innerText = data.msg;
             
@@ -422,7 +486,6 @@
             const div = document.createElement('div');
             div.className = `msg-wrapper ${type}`;
             
-            // 只有自己的訊息才有已讀標籤
             const readTag = type === 'me' ? '<div class="read-status"></div>' : '';
             div.innerHTML = `<div class="msg ${type}">${escapeHtml(text)}</div>${readTag}`;
             
@@ -439,7 +502,7 @@
         }
 
         function createTopicButtons(topics) {
-            removeTopicButtons(); // 先清除舊的
+            removeTopicButtons();
             
             const container = document.createElement('div');
             container.className = 'suggestion-container';
@@ -480,7 +543,6 @@
 
         // === 事件監聽 ===
 
-        // 打字狀態
         msgInput.addEventListener('input', () => {
             if (currentRoom) {
                 socket.emit('typing');
@@ -489,7 +551,6 @@
             }
         });
 
-        // Enter 鍵發送
         msgInput.addEventListener("keypress", (e) => { 
             if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -497,7 +558,6 @@
             }
         });
 
-        // 頁面可見性變化
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') {
                 if (!socket.connected) {
@@ -506,7 +566,6 @@
             }
         });
 
-        // 點擊覆蓋層關閉側邊欄
         document.getElementById('overlay').addEventListener('click', closeSidebar);
     </script>
 </body>
