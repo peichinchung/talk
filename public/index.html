@@ -197,7 +197,9 @@
     <div id="sidebar">
         <div class="menu-item" style="border-bottom:1px solid #666; font-weight:bold;">暖港野 HA TALK</div>
         <div class="menu-item" onclick="closeSidebar()">🏠 即時配對聊天</div>
-        <a href="https://www.instagram.com/hatalk_canton" target="_blank" class="menu-item">📸 Instagram</a>
+        <a href="https://www.instagram.com/hatalk_canton" target="_blank" class="menu-item">📸 投稿你的對話</a>
+        <a href="https://www.threads.com/@hatalk_canton" target="_blank" class="menu-item"> Threads討論最新話題</a>
+
     </div>
 
     <div id="overlay" onclick="closeSidebar()"></div>
@@ -460,7 +462,7 @@
             if (myMsgs.length > 0) {
                 const lastRead = myMsgs[myMsgs.length - 1];
                 lastRead.classList.add('show');
-                lastRead.innerText = '✓✓ 已讀';
+                lastRead.innerText = '已讀';
             }
         });
 
