@@ -21,40 +21,146 @@
             --sidebar-bg: #4a4542;
         }
         
+        * { box-sizing: border-box; }
+        
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-            margin: 0; background: var(--bg-color); 
-            height: 100vh; height: 100dvh; 
-            display: flex; color: var(--text-white); 
-            overflow: hidden; overscroll-behavior: none; 
+            margin: 0; 
+            background: var(--bg-color); 
+            height: 100vh; 
+            height: 100dvh; 
+            display: flex; 
+            color: var(--text-white); 
+            overflow: hidden; 
+            overscroll-behavior: none; 
             -webkit-tap-highlight-color: transparent;
+            /* 🔧 防止移動端縮放 */
+            touch-action: pan-y;
         }
         
-        #sidebar { width: 260px; background: var(--sidebar-bg); border-right: 1px solid rgba(0,0,0,0.2); display: flex; flex-direction: column; transition: 0.3s ease; z-index: 2000; position: absolute; left: -260px; height: 100%; }
+        #sidebar { 
+            width: 260px; 
+            background: var(--sidebar-bg); 
+            border-right: 1px solid rgba(0,0,0,0.2); 
+            display: flex; 
+            flex-direction: column; 
+            transition: 0.3s ease; 
+            z-index: 2000; 
+            position: fixed; 
+            left: -260px; 
+            height: 100%; 
+            top: 0;
+        }
         #sidebar.open { left: 0; }
-        .menu-item { padding: 15px 20px; color: #ddd; text-decoration: none; display: block; cursor: pointer; transition: background 0.2s; }
-        .menu-item:hover { background: rgba(255,255,255,0.1); }
-        #overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1500; }
+        .menu-item { 
+            padding: 15px 20px; 
+            color: #ddd; 
+            text-decoration: none; 
+            display: block; 
+            cursor: pointer; 
+            transition: background 0.2s; 
+        }
+        .menu-item:hover, .menu-item:active { 
+            background: rgba(255,255,255,0.1); 
+        }
+        #overlay { 
+            display: none; 
+            position: fixed; 
+            inset: 0; 
+            background: rgba(0,0,0,0.4); 
+            z-index: 1500; 
+        }
         #sidebar.open ~ #overlay { display: block; }
 
-        #main-container { flex: 1; display: flex; flex-direction: column; position: relative; width: 100%; height: 100%; }
-        header { background: var(--header-color); padding: 15px; display: flex; align-items: center; justify-content: space-between; font-weight: bold; flex-shrink: 0; }
+        #main-container { 
+            flex: 1; 
+            display: flex; 
+            flex-direction: column; 
+            position: relative; 
+            width: 100%; 
+            height: 100vh;
+            height: 100dvh;
+        }
         
-        #status-bar { display: none; background: #ff4d4d; color: white; font-size: 12px; text-align: center; padding: 6px; font-weight: bold; animation: slideDown 0.3s; }
-        @keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+        header { 
+            background: var(--header-color); 
+            padding: 15px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            font-weight: bold; 
+            flex-shrink: 0;
+            /* 🔧 支持安全區域 */
+            padding-top: max(15px, env(safe-area-inset-top));
+        }
+        
+        #status-bar { 
+            display: none; 
+            background: #ff4d4d; 
+            color: white; 
+            font-size: 12px; 
+            text-align: center; 
+            padding: 6px; 
+            font-weight: bold; 
+            animation: slideDown 0.3s; 
+        }
+        @keyframes slideDown { 
+            from { transform: translateY(-100%); } 
+            to { transform: translateY(0); } 
+        }
 
-        #chat-box { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 8px; scroll-behavior: smooth; padding-bottom: 60px; }
+        /* 🔧 聊天框改進 */
+        #chat-box { 
+            flex: 1; 
+            overflow-y: auto; 
+            overflow-x: hidden;
+            padding: 20px; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 8px; 
+            scroll-behavior: smooth; 
+            /* 🔧 增加底部空間，防止被輸入框或打字指示器遮擋 */
+            padding-bottom: 120px;
+            -webkit-overflow-scrolling: touch;
+        }
         
-        .msg-wrapper { display: flex; flex-direction: column; max-width: 75%; position: relative; margin-bottom: 4px; }
-        .msg-wrapper.me { align-self: flex-end; align-items: flex-end; }
-        .msg-wrapper.partner { align-self: flex-start; }
+        .msg-wrapper { 
+            display: flex; 
+            flex-direction: column; 
+            max-width: 75%; 
+            position: relative; 
+            margin-bottom: 4px; 
+        }
+        .msg-wrapper.me { 
+            align-self: flex-end; 
+            align-items: flex-end; 
+        }
+        .msg-wrapper.partner { 
+            align-self: flex-start; 
+        }
         
-        .msg { padding: 12px 16px; border-radius: 20px; font-size: 15px; line-height: 1.4; word-wrap: break-word; animation: msgPop 0.2s ease; }
-        .msg.me { background: var(--my-msg); border-bottom-right-radius: 4px; }
-        .msg.partner { background: var(--partner-msg); border-bottom-left-radius: 4px; }
-        @keyframes msgPop { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
+        .msg { 
+            padding: 12px 16px; 
+            border-radius: 20px; 
+            font-size: 15px; 
+            line-height: 1.4; 
+            word-wrap: break-word; 
+            word-break: break-word;
+            animation: msgPop 0.2s ease; 
+        }
+        .msg.me { 
+            background: var(--my-msg); 
+            border-bottom-right-radius: 4px; 
+        }
+        .msg.partner { 
+            background: var(--partner-msg); 
+            border-bottom-left-radius: 4px; 
+        }
+        @keyframes msgPop { 
+            from { opacity: 0; transform: scale(0.8); } 
+            to { opacity: 1; transform: scale(1); } 
+        }
 
-        /* ✅ 已讀狀態改進 */
         .read-status { 
             font-size: 11px; 
             color: rgba(255,255,255,0.6); 
@@ -69,12 +175,12 @@
             font-weight: 500;
         }
 
-        /* ✅ 打字指示器改進 - 顯示在輸入框上方 */
+        /* 🔧 打字指示器改進 - 固定在輸入框正上方 */
         #typing-indicator { 
-            position: absolute;
-            bottom: 70px;
+            position: fixed;
+            /* 🔧 動態計算位置：輸入框高度 + padding + 安全區域 */
+            bottom: calc(60px + env(safe-area-inset-bottom));
             left: 20px;
-            right: 20px;
             display: none;
             align-items: center;
             gap: 8px;
@@ -82,38 +188,134 @@
             padding: 8px 16px;
             border-radius: 20px;
             width: fit-content;
+            max-width: calc(100% - 40px);
             animation: slideUp 0.3s ease;
-            z-index: 100;
+            z-index: 50;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
         }
         #typing-indicator.show { display: flex; }
-        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes slideUp { 
+            from { transform: translateY(20px); opacity: 0; } 
+            to { transform: translateY(0); opacity: 1; } 
+        }
         
-        .typing-text { font-size: 13px; color: white; font-style: italic; }
-        .typing-dots { display: flex; gap: 3px; }
-        .typing-dot { width: 6px; height: 6px; background: rgba(255,255,255,0.8); border-radius: 50%; animation: bounce 1.4s infinite ease-in-out both; }
+        .typing-text { 
+            font-size: 13px; 
+            color: white; 
+            font-style: italic; 
+            white-space: nowrap;
+        }
+        .typing-dots { 
+            display: flex; 
+            gap: 3px; 
+        }
+        .typing-dot { 
+            width: 6px; 
+            height: 6px; 
+            background: rgba(255,255,255,0.8); 
+            border-radius: 50%; 
+            animation: bounce 1.4s infinite ease-in-out both; 
+        }
         .typing-dot:nth-child(1) { animation-delay: -0.32s; } 
         .typing-dot:nth-child(2) { animation-delay: -0.16s; }
-        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+        @keyframes bounce { 
+            0%, 80%, 100% { transform: scale(0); } 
+            40% { transform: scale(1); } 
+        }
 
-        .rematch-container { text-align: center; margin: 30px 0; animation: fadeIn 0.5s forwards; }
+        .rematch-container { 
+            text-align: center; 
+            margin: 30px 0; 
+            animation: fadeIn 0.5s forwards; 
+        }
         .rematch-btn {
-            background: var(--accent-color); color: white; border: none; padding: 12px 28px;
-            border-radius: 30px; font-weight: bold; font-size: 15px; cursor: pointer;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3); transition: all 0.2s;
+            background: var(--accent-color); 
+            color: white; 
+            border: none; 
+            padding: 12px 28px;
+            border-radius: 30px; 
+            font-weight: bold; 
+            font-size: 15px; 
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3); 
+            transition: all 0.2s;
+            /* 🔧 防止點擊時縮放失控 */
+            -webkit-tap-highlight-color: transparent;
         }
         .rematch-btn:active { transform: scale(0.95); }
 
-        .system { align-self: center; font-size: 12px; color: #d1d1d1; background: rgba(0,0,0,0.2); padding: 6px 14px; border-radius: 12px; text-align: center; margin: 5px 0; }
+        .system { 
+            align-self: center; 
+            font-size: 12px; 
+            color: #d1d1d1; 
+            background: rgba(0,0,0,0.2); 
+            padding: 6px 14px; 
+            border-radius: 12px; 
+            text-align: center; 
+            margin: 5px 0;
+            max-width: 90%;
+        }
 
-        #input-area { background: var(--header-color); padding: 10px; display: flex; gap: 8px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); position: relative; }
-        input { flex: 1; border: none; background: rgba(255,255,255,0.15); padding: 12px 16px; border-radius: 25px; color: white; outline: none; font-size: 16px; }
-        input::placeholder { color: rgba(255,255,255,0.6); }
-        button#btn { background: var(--accent-color); border: none; color: white; font-weight: bold; padding: 0 20px; border-radius: 25px; cursor: pointer; min-width: 60px; transition: opacity 0.2s; }
-        button#btn:disabled { opacity: 0.4; cursor: not-allowed; }
-        #end-btn { background: rgba(220, 60, 60, 0.9); border: none; color: white; font-weight: bold; padding: 0 16px; margin-right: 8px; border-radius: 25px; cursor: pointer; display: none; transition: all 0.2s; }
+        /* 🔧 輸入區域改進 */
+        #input-area { 
+            background: var(--header-color); 
+            padding: 10px; 
+            display: flex; 
+            gap: 8px; 
+            /* 🔧 支持安全區域 */
+            padding-bottom: calc(10px + env(safe-area-inset-bottom)); 
+            position: relative;
+            flex-shrink: 0;
+            border-top: 1px solid rgba(0,0,0,0.1);
+        }
+        
+        input { 
+            flex: 1; 
+            border: none; 
+            background: rgba(255,255,255,0.15); 
+            padding: 12px 16px; 
+            border-radius: 25px; 
+            color: white; 
+            outline: none; 
+            font-size: 16px;
+            /* 🔧 防止 iOS 自動縮放 */
+            max-width: 100%;
+        }
+        input::placeholder { 
+            color: rgba(255,255,255,0.6); 
+        }
+        
+        button#btn { 
+            background: var(--accent-color); 
+            border: none; 
+            color: white; 
+            font-weight: bold; 
+            padding: 0 20px; 
+            border-radius: 25px; 
+            cursor: pointer; 
+            min-width: 60px; 
+            transition: opacity 0.2s;
+            flex-shrink: 0;
+        }
+        button#btn:disabled { 
+            opacity: 0.4; 
+            cursor: not-allowed; 
+        }
+        
+        #end-btn { 
+            background: rgba(220, 60, 60, 0.9); 
+            border: none; 
+            color: white; 
+            font-weight: bold; 
+            padding: 0 16px; 
+            border-radius: 25px; 
+            cursor: pointer; 
+            display: none; 
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
         #end-btn:active { transform: scale(0.95); }
 
-        /* ✅ 話題建議按鈕 */
         .suggestion-container { 
             display: flex; 
             flex-wrap: wrap; 
@@ -123,7 +325,10 @@
             padding: 10px;
             animation: fadeInUp 0.5s ease;
         }
-        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeInUp { 
+            from { opacity: 0; transform: translateY(20px); } 
+            to { opacity: 1; transform: translateY(0); } 
+        }
         
         .topic-btn { 
             background: linear-gradient(135deg, var(--accent-color), #8a7a9b);
@@ -135,14 +340,12 @@
             cursor: pointer; 
             transition: all 0.3s;
             box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            -webkit-tap-highlight-color: transparent;
         }
-        .topic-btn:hover { 
-            transform: translateY(-2px); 
-            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        .topic-btn:active { 
+            transform: scale(0.95); 
         }
-        .topic-btn:active { transform: scale(0.95); }
 
-        /* ✅ 等待時的趣味內容 */
         .joke-card { 
             align-self: center;
             background: linear-gradient(135deg, rgba(160, 139, 171, 0.25), rgba(140, 132, 133, 0.25));
@@ -173,10 +376,57 @@
             line-height: 1.6;
         }
 
-        #disclaimer-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: flex; justify-content: center; align-items: center; z-index: 9999; backdrop-filter: blur(5px); }
-        .modal-content { background: white; color: #333; padding: 30px; border-radius: 20px; width: 85%; max-width: 400px; text-align: center; }
-        .modal-btn { background: var(--accent-color); color: white; border: none; padding: 12px 30px; border-radius: 25px; font-weight: bold; font-size: 16px; cursor: pointer; margin-top: 15px; width: 100%; transition: all 0.2s; }
+        #disclaimer-modal { 
+            position: fixed; 
+            inset: 0; 
+            background: rgba(0,0,0,0.9); 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            z-index: 9999; 
+            backdrop-filter: blur(5px); 
+        }
+        .modal-content { 
+            background: white; 
+            color: #333; 
+            padding: 30px; 
+            border-radius: 20px; 
+            width: 85%; 
+            max-width: 400px; 
+            text-align: center;
+            /* 🔧 防止在小螢幕被截斷 */
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .modal-btn { 
+            background: var(--accent-color); 
+            color: white; 
+            border: none; 
+            padding: 12px 30px; 
+            border-radius: 25px; 
+            font-weight: bold; 
+            font-size: 16px; 
+            cursor: pointer; 
+            margin-top: 15px; 
+            width: 100%; 
+            transition: all 0.2s; 
+        }
         .modal-btn:active { transform: scale(0.98); }
+
+        /* 🔧 移動端特定優化 */
+        @media (max-width: 768px) {
+            .msg-wrapper {
+                max-width: 85%;
+            }
+            
+            header {
+                padding: 12px 15px;
+            }
+            
+            #chat-box {
+                padding: 15px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -187,7 +437,7 @@
             <div style="text-align:left; font-size:14px; color:#666; line-height:1.6; margin: 20px 0;">
                 <p>1. 這裡是一個匿名配對聊天空間。</p>
                 <p>2. 嚴禁騷擾、詐騙、廣告或非法行為。</p>
-                <p>3. 系統不儲存對話，離開即焚。</p>
+                <p>3. 系統不儲存對話,離開即焚。</p>
                 <p>4. 點擊按鈕即代表您已成年並同意規則。</p>
             </div>
             <button class="modal-btn" onclick="agreeDisclaimer()">我同意並開始配對</button>
@@ -198,8 +448,7 @@
         <div class="menu-item" style="border-bottom:1px solid #666; font-weight:bold;">暖港野 HA TALK</div>
         <div class="menu-item" onclick="closeSidebar()">🏠 即時配對聊天</div>
         <a href="https://www.instagram.com/hatalk_canton" target="_blank" class="menu-item">📸 投稿你的對話</a>
-        <a href="https://www.threads.com/@hatalk_canton" target="_blank" class="menu-item"> Threads討論最新話題</a>
-
+        <a href="https://www.threads.com/@hatalk_canton" target="_blank" class="menu-item">🧵 Threads討論最新話題</a>
     </div>
 
     <div id="overlay" onclick="closeSidebar()"></div>
@@ -215,7 +464,6 @@
         
         <div id="chat-box"></div>
         
-        <!-- ✅ 打字指示器（顯示在輸入框上方） -->
         <div id="typing-indicator">
             <span class="typing-text">對方打緊字...</span>
             <div class="typing-dots">
@@ -250,7 +498,6 @@
             timeout: 10000
         });
 
-        // 介面元素
         const chatBox = document.getElementById('chat-box');
         const msgInput = document.getElementById('msg');
         const mainBtn = document.getElementById('btn');
@@ -263,7 +510,6 @@
         let isSearching = false;
         let typingTimeout = null;
 
-        // ✅ 等待時的趣味內容（每5秒輪換）
         const waitContent = [
             { type: "急口令", text: "入實驗室，撳緊急掣。" },
             { type: "急口令", text: "郵差叔叔，送信純熟，迅速送出。" },
@@ -277,16 +523,19 @@
             { type: "提醒", text: "遇到奇怪嘅人可以隨時離開，<br>安全第一！👍" }
         ];
 
-        // === 主要功能 ===
+        // 🔧 移動端鍵盤處理
+        function scrollToBottom() {
+            setTimeout(() => {
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }, 100);
+        }
 
-        // ✅ 3) 免責聲明後直接開始配對
         function agreeDisclaimer() {
             document.getElementById('disclaimer-modal').style.display = 'none';
             msgInput.placeholder = "正在開始配對...";
             mainBtn.innerText = '配對中';
             mainBtn.disabled = true;
             
-            // 確保連線後立即開始配對
             if (socket.connected) {
                 startSearch(); 
             } else {
@@ -321,7 +570,6 @@
             endBtn.style.display = 'none';
             typingIndicator.classList.remove('show');
 
-            // ✅ 4) 等待時每5秒顯示笑話
             const showJoke = () => {
                 const old = document.querySelector('.joke-card');
                 if (old) old.remove();
@@ -334,11 +582,11 @@
                     <div class="joke-text">${item.text}</div>
                 `;
                 chatBox.appendChild(jokeDiv);
-                chatBox.scrollTop = chatBox.scrollHeight;
+                scrollToBottom();
             };
             
-            showJoke(); // 立即顯示第一個
-            waitTimer = setInterval(showJoke, 5000); // 每5秒一次
+            showJoke();
+            waitTimer = setInterval(showJoke, 5000);
         }
 
         function sendMsg() {
@@ -398,10 +646,8 @@
             div.className = 'rematch-container';
             div.innerHTML = `<button class="rematch-btn" onclick="startSearch()">🔄 找下一個</button>`;
             chatBox.appendChild(div);
-            chatBox.scrollTop = chatBox.scrollHeight;
+            scrollToBottom();
         }
-
-        // === Socket 事件監聽 ===
 
         socket.on('connect', () => {
             console.log('✅ Connected:', myUserId);
@@ -436,7 +682,6 @@
             chatBox.innerHTML = '';
             addSystemMsg('🎉 配對成功！大家打個招呼吧');
             
-            // ✅ 5) 配對成功後顯示話題建議
             if (data.topics && data.topics.length > 0) {
                 createTopicButtons(data.topics);
             }
@@ -451,29 +696,24 @@
         socket.on('receive_msg', (data) => {
             typingIndicator.classList.remove('show');
             addMsg(data.msg, 'partner');
-            
-            // ✅ 1) 發送已讀回執
             socket.emit('msg_read');
         });
 
-        // ✅ 1) 接收對方已讀狀態
         socket.on('partner_read', () => {
             const myMsgs = document.querySelectorAll('.msg-wrapper.me .read-status');
             if (myMsgs.length > 0) {
                 const lastRead = myMsgs[myMsgs.length - 1];
                 lastRead.classList.add('show');
-                lastRead.innerText = '已讀';
+                lastRead.innerText = '✓✓ 已讀';
             }
         });
 
         socket.on('partner_left', (data) => {
             console.log('👋 Partner left');
-            
             if (waitTimer) {
                 clearInterval(waitTimer);
                 waitTimer = null;
             }
-            
             addSystemMsg(data.msg || '對方已離開');
             resetToIdle();
             showRematchButton();
@@ -481,12 +721,10 @@
 
         socket.on('chat_ended', (data) => {
             console.log('🔚 Chat ended');
-            
             if (waitTimer) {
                 clearInterval(waitTimer);
                 waitTimer = null;
             }
-            
             addSystemMsg(data.msg || '對話已結束');
             resetToIdle();
             showRematchButton();
@@ -512,7 +750,6 @@
             endBtn.style.display = 'block';
         });
 
-        // ✅ 2) 打字指示器顯示在輸入框上方
         socket.on('partner_typing', () => {
             typingIndicator.classList.add('show');
         });
@@ -522,7 +759,6 @@
         });
 
         socket.on('partner_status', (data) => {
-            // 可以在這裡添加連線狀態提示
             if (data.status === 'offline') {
                 addSystemMsg(data.msg);
                 msgInput.disabled = true;
@@ -538,9 +774,6 @@
             console.log('⏳ Waiting...', data);
         });
 
-        // === 輔助函式 ===
-
-        // ✅ 1) 添加已讀狀態顯示
         function addMsg(text, type) {
             const div = document.createElement('div');
             div.className = `msg-wrapper ${type}`;
@@ -552,7 +785,7 @@
             `;
             
             chatBox.appendChild(div);
-            chatBox.scrollTop = chatBox.scrollHeight;
+            scrollToBottom();
         }
 
         function addSystemMsg(text) {
@@ -560,10 +793,9 @@
             div.className = 'system';
             div.innerText = text;
             chatBox.appendChild(div);
-            chatBox.scrollTop = chatBox.scrollHeight;
+            scrollToBottom();
         }
 
-        // ✅ 5) 創建話題建議按鈕
         function createTopicButtons(topics) {
             removeTopicButtons();
             
@@ -587,7 +819,7 @@
             });
             
             chatBox.appendChild(container);
-            chatBox.scrollTop = chatBox.scrollHeight;
+            scrollToBottom();
         }
 
         function removeTopicButtons() {
@@ -609,9 +841,6 @@
             document.getElementById('sidebar').classList.remove('open'); 
         }
 
-        // === 事件監聽 ===
-
-        // ✅ 2) 用戶打字時發送 typing 事件
         msgInput.addEventListener('input', () => {
             if (currentRoom) {
                 socket.emit('typing');
@@ -625,6 +854,11 @@
                 e.preventDefault();
                 sendMsg();
             }
+        });
+
+        // 🔧 移動端鍵盤彈出時自動滾動
+        msgInput.addEventListener('focus', () => {
+            setTimeout(scrollToBottom, 300);
         });
 
         document.addEventListener('visibilitychange', () => {
