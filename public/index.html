@@ -43,7 +43,7 @@
         #status-bar { display: none; background: #ff4d4d; color: white; font-size: 12px; text-align: center; padding: 6px; font-weight: bold; animation: slideDown 0.3s; }
         @keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }
 
-        #chat-box { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 8px; scroll-behavior: smooth; }
+        #chat-box { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 8px; scroll-behavior: smooth; padding-bottom: 60px; }
         
         .msg-wrapper { display: flex; flex-direction: column; max-width: 75%; position: relative; margin-bottom: 4px; }
         .msg-wrapper.me { align-self: flex-end; align-items: flex-end; }
@@ -54,16 +54,45 @@
         .msg.partner { background: var(--partner-msg); border-bottom-left-radius: 4px; }
         @keyframes msgPop { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
 
-        .read-status { font-size: 10px; color: rgba(255,255,255,0.5); margin-top: 2px; margin-right: 4px; height: 14px; opacity: 0; transition: opacity 0.3s; }
-        .read-status.active { opacity: 1; }
-
-        .typing-bubble {
-            align-self: flex-start; background: var(--partner-msg); padding: 10px 16px;
-            border-radius: 20px; border-bottom-left-radius: 4px; width: fit-content;
-            display: none; align-items: center; gap: 4px; margin-bottom: 10px;
+        /* ✅ 已讀狀態改進 */
+        .read-status { 
+            font-size: 11px; 
+            color: rgba(255,255,255,0.6); 
+            margin-top: 3px; 
+            margin-right: 4px; 
+            height: 16px; 
+            transition: all 0.3s ease;
         }
-        .dot { width: 6px; height: 6px; background: rgba(255,255,255,0.7); border-radius: 50%; animation: bounce 1.4s infinite ease-in-out both; }
-        .dot:nth-child(1) { animation-delay: -0.32s; } .dot:nth-child(2) { animation-delay: -0.16s; }
+        .read-status.show { 
+            opacity: 1;
+            color: #4CAF50;
+            font-weight: 500;
+        }
+
+        /* ✅ 打字指示器改進 - 顯示在輸入框上方 */
+        #typing-indicator { 
+            position: absolute;
+            bottom: 70px;
+            left: 20px;
+            right: 20px;
+            display: none;
+            align-items: center;
+            gap: 8px;
+            background: rgba(140, 132, 133, 0.95);
+            padding: 8px 16px;
+            border-radius: 20px;
+            width: fit-content;
+            animation: slideUp 0.3s ease;
+            z-index: 100;
+        }
+        #typing-indicator.show { display: flex; }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        
+        .typing-text { font-size: 13px; color: white; font-style: italic; }
+        .typing-dots { display: flex; gap: 3px; }
+        .typing-dot { width: 6px; height: 6px; background: rgba(255,255,255,0.8); border-radius: 50%; animation: bounce 1.4s infinite ease-in-out both; }
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; } 
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
         @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
 
         .rematch-container { text-align: center; margin: 30px 0; animation: fadeIn 0.5s forwards; }
@@ -76,27 +105,78 @@
 
         .system { align-self: center; font-size: 12px; color: #d1d1d1; background: rgba(0,0,0,0.2); padding: 6px 14px; border-radius: 12px; text-align: center; margin: 5px 0; }
 
-        #input-area { background: var(--header-color); padding: 10px; display: flex; gap: 8px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+        #input-area { background: var(--header-color); padding: 10px; display: flex; gap: 8px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); position: relative; }
         input { flex: 1; border: none; background: rgba(255,255,255,0.15); padding: 12px 16px; border-radius: 25px; color: white; outline: none; font-size: 16px; }
         input::placeholder { color: rgba(255,255,255,0.6); }
         button#btn { background: var(--accent-color); border: none; color: white; font-weight: bold; padding: 0 20px; border-radius: 25px; cursor: pointer; min-width: 60px; transition: opacity 0.2s; }
         button#btn:disabled { opacity: 0.4; cursor: not-allowed; }
         #end-btn { background: rgba(220, 60, 60, 0.9); border: none; color: white; font-weight: bold; padding: 0 16px; margin-right: 8px; border-radius: 25px; cursor: pointer; display: none; transition: all 0.2s; }
         #end-btn:active { transform: scale(0.95); }
-        
-        #typing-text-status { font-size: 12px; color: #ffd700; padding: 0 20px; height: 20px; font-style: italic; position: absolute; bottom: 70px; left: 0; width: 100%; pointer-events: none; text-align: center; }
 
-        .suggestion-container { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 10px 0; }
-        .topic-btn { background: var(--accent-color); color: white; border: none; padding: 8px 14px; border-radius: 15px; font-size: 13px; cursor: pointer; transition: all 0.2s; }
+        /* ✅ 話題建議按鈕 */
+        .suggestion-container { 
+            display: flex; 
+            flex-wrap: wrap; 
+            gap: 8px; 
+            justify-content: center; 
+            margin: 15px 0; 
+            padding: 10px;
+            animation: fadeInUp 0.5s ease;
+        }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .topic-btn { 
+            background: linear-gradient(135deg, var(--accent-color), #8a7a9b);
+            color: white; 
+            border: none; 
+            padding: 10px 16px; 
+            border-radius: 20px; 
+            font-size: 13px; 
+            cursor: pointer; 
+            transition: all 0.3s;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        .topic-btn:hover { 
+            transform: translateY(-2px); 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
         .topic-btn:active { transform: scale(0.95); }
+
+        /* ✅ 等待時的趣味內容 */
+        .joke-card { 
+            align-self: center;
+            background: linear-gradient(135deg, rgba(160, 139, 171, 0.25), rgba(140, 132, 133, 0.25));
+            border-left: 4px solid var(--accent-color); 
+            padding: 16px 20px;
+            margin: 12px 20px;
+            border-radius: 12px;
+            max-width: 85%;
+            animation: fadeInScale 0.6s ease;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        @keyframes fadeInScale { 
+            from { opacity: 0; transform: scale(0.9) translateY(10px); } 
+            to { opacity: 1; transform: scale(1) translateY(0); } 
+        }
+        
+        .joke-label { 
+            color: var(--accent-color); 
+            font-weight: bold; 
+            font-size: 12px; 
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .joke-text { 
+            color: #f0f0f0; 
+            font-size: 14px; 
+            line-height: 1.6;
+        }
 
         #disclaimer-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: flex; justify-content: center; align-items: center; z-index: 9999; backdrop-filter: blur(5px); }
         .modal-content { background: white; color: #333; padding: 30px; border-radius: 20px; width: 85%; max-width: 400px; text-align: center; }
         .modal-btn { background: var(--accent-color); color: white; border: none; padding: 12px 30px; border-radius: 25px; font-weight: bold; font-size: 16px; cursor: pointer; margin-top: 15px; width: 100%; transition: all 0.2s; }
         .modal-btn:active { transform: scale(0.98); }
-        
-        .joke-fade { animation: fadeIn 0.8s ease-in-out; background: rgba(160, 139, 171, 0.2) !important; border-left: 4px solid var(--accent-color); padding: 15px !important; margin: 10px 0 !important; font-size: 14px; border-radius: 8px; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
@@ -133,11 +213,15 @@
         
         <div id="chat-box"></div>
         
-        <div id="typing-bubble-container" class="typing-bubble">
-            <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        <!-- ✅ 打字指示器（顯示在輸入框上方） -->
+        <div id="typing-indicator">
+            <span class="typing-text">對方打緊字...</span>
+            <div class="typing-dots">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+            </div>
         </div>
-
-        <div id="typing-text-status"></div>
         
         <div id="input-area">
             <button id="end-btn" onclick="endChat()">離開</button>
@@ -151,7 +235,6 @@
         // === 初始化 ===
         let myUserId = localStorage.getItem('ha_talk_uid');
         if (!myUserId) {
-            // 🔧 FIX: 更好的 userId 生成，降低重複機率
             myUserId = 'u_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9) + Math.random().toString(36).substr(2, 5);
             localStorage.setItem('ha_talk_uid', myUserId);
         }
@@ -170,33 +253,41 @@
         const msgInput = document.getElementById('msg');
         const mainBtn = document.getElementById('btn');
         const statusBar = document.getElementById('status-bar');
-        const typingTextStatus = document.getElementById('typing-text-status');
+        const typingIndicator = document.getElementById('typing-indicator');
         const endBtn = document.getElementById('end-btn');
-        const typingBubble = document.getElementById('typing-bubble-container');
 
         let currentRoom = null;
         let waitTimer = null;
         let isSearching = false;
         let typingTimeout = null;
 
+        // ✅ 等待時的趣味內容（每5秒輪換）
         const waitContent = [
             { type: "急口令", text: "入實驗室，撳緊急掣。" },
             { type: "急口令", text: "郵差叔叔，送信純熟，迅速送出。" },
-            { type: "爛gag", text: "點解小明跑得快過火車？<br>... 因為小明喺火車入面跑。" },
-            { type: "爛gag", text: "大明養小明，咁邊個養大明？<br>... 狗（因為「久」仰大明）" },
-            { type: "冷知識", text: "原來廣東話有 9 個聲調：『詩史試時市事兒似寺』" },
-            { type: "提醒", text: "匿名聊天雖然好玩，但記得都要尊重對方 ❤️" }
+            { type: "急口令", text: "床腳撞牆角，牆角撞床腳。" },
+            { type: "爛Gag", text: "點解小明跑得快過火車？<br><small>因為小明喺火車入面跑。</small>" },
+            { type: "爛Gag", text: "大明養小明，咁邊個養大明？<br><small>狗（因為「久」仰大明）</small>" },
+            { type: "爛Gag", text: "點解雪糕會溶？<br><small>因為佢太軟弱啦！</small>" },
+            { type: "冷知識", text: "廣東話有 9 個聲調：<br>『詩史試時市事兒似寺』" },
+            { type: "冷知識", text: "「八卦」原本係指八個方位，<br>而家變咗講人是非 😄" },
+            { type: "提醒", text: "匿名聊天雖然好玩，<br>但記得都要尊重對方 ❤️" },
+            { type: "提醒", text: "遇到奇怪嘅人可以隨時離開，<br>安全第一！👍" }
         ];
 
         // === 主要功能 ===
 
+        // ✅ 3) 免責聲明後直接開始配對
         function agreeDisclaimer() {
             document.getElementById('disclaimer-modal').style.display = 'none';
-            msgInput.placeholder = "等待開始...";
+            msgInput.placeholder = "正在開始配對...";
+            mainBtn.innerText = '配對中';
+            mainBtn.disabled = true;
+            
+            // 確保連線後立即開始配對
             if (socket.connected) {
                 startSearch(); 
             } else {
-                mainBtn.innerText = '連線中...';
                 socket.autoStartSearch = true;
             }
         }
@@ -211,7 +302,6 @@
             isSearching = true;
             currentRoom = null;
             
-            // 🔧 FIX: 確保清理舊的 timer
             if (waitTimer) {
                 clearInterval(waitTimer);
                 waitTimer = null;
@@ -227,29 +317,32 @@
             msgInput.disabled = true;
             msgInput.placeholder = "搜尋中...";
             endBtn.style.display = 'none';
-            typingTextStatus.innerText = '';
+            typingIndicator.classList.remove('show');
 
-            // 顯示趣味內容
+            // ✅ 4) 等待時每5秒顯示笑話
             const showJoke = () => {
-                const old = document.querySelector('.joke-fade');
+                const old = document.querySelector('.joke-card');
                 if (old) old.remove();
                 
                 const item = waitContent[Math.floor(Math.random() * waitContent.length)];
                 const jokeDiv = document.createElement('div');
-                jokeDiv.className = 'joke-fade';
-                jokeDiv.innerHTML = `<small style="color:var(--accent-color); font-weight:bold;">[${item.type}]</small><br>${item.text}`;
+                jokeDiv.className = 'joke-card';
+                jokeDiv.innerHTML = `
+                    <div class="joke-label">${item.type}</div>
+                    <div class="joke-text">${item.text}</div>
+                `;
                 chatBox.appendChild(jokeDiv);
                 chatBox.scrollTop = chatBox.scrollHeight;
             };
-            showJoke();
-            waitTimer = setInterval(showJoke, 6000);
+            
+            showJoke(); // 立即顯示第一個
+            waitTimer = setInterval(showJoke, 5000); // 每5秒一次
         }
 
         function sendMsg() {
             const text = msgInput.value.trim();
             if (!text || !currentRoom) return;
 
-            // 暫時禁用防止重複發送
             msgInput.disabled = true;
             mainBtn.disabled = true;
 
@@ -280,7 +373,6 @@
             currentRoom = null;
             isSearching = false;
             
-            // 🔧 FIX: 確保清理 timer
             if (waitTimer) {
                 clearInterval(waitTimer);
                 waitTimer = null;
@@ -288,18 +380,15 @@
             
             msgInput.disabled = true;
             msgInput.value = '';
-            msgInput.placeholder = "等待配對中...";
+            msgInput.placeholder = "按「開始」進行配對...";
             mainBtn.innerText = '開始';
             mainBtn.disabled = false;
             endBtn.style.display = 'none';
-            typingBubble.style.display = 'none';
-            typingTextStatus.innerText = '';
+            typingIndicator.classList.remove('show');
             removeTopicButtons();
         }
 
-        // 🔧 FIX: 防止重複顯示按鈕
         function showRematchButton() {
-            // 先移除舊的按鈕
             const oldBtn = document.querySelector('.rematch-container');
             if (oldBtn) oldBtn.remove();
             
@@ -332,26 +421,10 @@
             msgInput.disabled = true;
         });
 
-        // 🔧 FIX: 新增 error 事件監聽
-        socket.on('error', (data) => {
-            console.error('❌ Server error:', data);
-            addSystemMsg('❌ ' + (data.msg || '發生錯誤'));
-            
-            // 如果是嚴重錯誤（如 session 無效），建議重新整理
-            if (data.msg && data.msg.includes('重新整理')) {
-                setTimeout(() => {
-                    if (confirm('發生錯誤，是否重新整理頁面？')) {
-                        window.location.reload();
-                    }
-                }, 1000);
-            }
-        });
-
         socket.on('matched', (data) => {
             console.log('🎉 Matched:', data.roomId);
             isSearching = false;
             
-            // 🔧 FIX: 確保清理 timer
             if (waitTimer) {
                 clearInterval(waitTimer);
                 waitTimer = null;
@@ -361,7 +434,7 @@
             chatBox.innerHTML = '';
             addSystemMsg('🎉 配對成功！大家打個招呼吧');
             
-            // 顯示話題建議
+            // ✅ 5) 配對成功後顯示話題建議
             if (data.topics && data.topics.length > 0) {
                 createTopicButtons(data.topics);
             }
@@ -371,28 +444,29 @@
             mainBtn.innerText = '傳送';
             mainBtn.disabled = false;
             endBtn.style.display = 'block';
-            typingTextStatus.innerText = '';
         });
 
         socket.on('receive_msg', (data) => {
-            typingBubble.style.display = 'none';
+            typingIndicator.classList.remove('show');
             addMsg(data.msg, 'partner');
+            
+            // ✅ 1) 發送已讀回執
             socket.emit('msg_read');
         });
 
+        // ✅ 1) 接收對方已讀狀態
         socket.on('partner_read', () => {
             const myMsgs = document.querySelectorAll('.msg-wrapper.me .read-status');
             if (myMsgs.length > 0) {
                 const lastRead = myMsgs[myMsgs.length - 1];
-                lastRead.classList.add('active');
-                lastRead.innerText = '已讀';
+                lastRead.classList.add('show');
+                lastRead.innerText = '✓✓ 已讀';
             }
         });
 
         socket.on('partner_left', (data) => {
             console.log('👋 Partner left');
             
-            // 🔧 FIX: 清理 timer
             if (waitTimer) {
                 clearInterval(waitTimer);
                 waitTimer = null;
@@ -406,7 +480,6 @@
         socket.on('chat_ended', (data) => {
             console.log('🔚 Chat ended');
             
-            // 🔧 FIX: 清理 timer
             if (waitTimer) {
                 clearInterval(waitTimer);
                 waitTimer = null;
@@ -423,7 +496,6 @@
             isSearching = false;
             statusBar.style.display = 'none';
             
-            // 🔧 FIX: 清理可能還在運行的 timer
             if (waitTimer) {
                 clearInterval(waitTimer);
                 waitTimer = null;
@@ -436,44 +508,28 @@
             mainBtn.innerText = '傳送';
             mainBtn.disabled = false;
             endBtn.style.display = 'block';
-            typingTextStatus.innerText = '';
         });
 
-        socket.on('room_closed', (data) => {
-            console.log('🚪 Room closed:', data);
-            
-            // 🔧 FIX: 清理 timer
-            if (waitTimer) {
-                clearInterval(waitTimer);
-                waitTimer = null;
-            }
-            
-            addSystemMsg(data.msg || '房間已關閉');
-            resetToIdle();
-            showRematchButton();
-        });
-
-        socket.on('partner_status', (data) => {
-            typingTextStatus.innerText = data.msg;
-            
-            // 如果對方重連，3秒後清除提示
-            if (data.status === 'online') {
-                setTimeout(() => {
-                    if (typingTextStatus.innerText === data.msg) {
-                        typingTextStatus.innerText = '';
-                    }
-                }, 3000);
-            }
-        });
-
+        // ✅ 2) 打字指示器顯示在輸入框上方
         socket.on('partner_typing', () => {
-            typingBubble.style.display = 'flex';
-            chatBox.appendChild(typingBubble);
-            chatBox.scrollTop = chatBox.scrollHeight;
+            typingIndicator.classList.add('show');
         });
 
         socket.on('partner_stop_typing', () => {
-            typingBubble.style.display = 'none';
+            typingIndicator.classList.remove('show');
+        });
+
+        socket.on('partner_status', (data) => {
+            // 可以在這裡添加連線狀態提示
+            if (data.status === 'offline') {
+                addSystemMsg(data.msg);
+                msgInput.disabled = true;
+                mainBtn.disabled = true;
+            } else if (data.status === 'online') {
+                addSystemMsg(data.msg);
+                msgInput.disabled = false;
+                mainBtn.disabled = false;
+            }
         });
 
         socket.on('waiting', (data) => {
@@ -482,14 +538,18 @@
 
         // === 輔助函式 ===
 
+        // ✅ 1) 添加已讀狀態顯示
         function addMsg(text, type) {
             const div = document.createElement('div');
             div.className = `msg-wrapper ${type}`;
             
-            const readTag = type === 'me' ? '<div class="read-status"></div>' : '';
-            div.innerHTML = `<div class="msg ${type}">${escapeHtml(text)}</div>${readTag}`;
+            const readTag = type === 'me' ? '<div class="read-status">✓ 已送出</div>' : '';
+            div.innerHTML = `
+                <div class="msg ${type}">${escapeHtml(text)}</div>
+                ${readTag}
+            `;
             
-            chatBox.insertBefore(div, typingBubble);
+            chatBox.appendChild(div);
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
@@ -497,15 +557,21 @@
             const div = document.createElement('div');
             div.className = 'system';
             div.innerText = text;
-            chatBox.insertBefore(div, typingBubble);
+            chatBox.appendChild(div);
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
+        // ✅ 5) 創建話題建議按鈕
         function createTopicButtons(topics) {
             removeTopicButtons();
             
             const container = document.createElement('div');
             container.className = 'suggestion-container';
+            
+            const hint = document.createElement('div');
+            hint.style.cssText = 'width: 100%; text-align: center; font-size: 12px; color: #ddd; margin-bottom: 8px;';
+            hint.innerText = '💡 可以用呢啲話題開始聊天：';
+            container.appendChild(hint);
             
             topics.forEach(topic => {
                 const btn = document.createElement('button');
@@ -518,7 +584,7 @@
                 container.appendChild(btn);
             });
             
-            chatBox.insertBefore(container, typingBubble);
+            chatBox.appendChild(container);
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
@@ -543,6 +609,7 @@
 
         // === 事件監聽 ===
 
+        // ✅ 2) 用戶打字時發送 typing 事件
         msgInput.addEventListener('input', () => {
             if (currentRoom) {
                 socket.emit('typing');
