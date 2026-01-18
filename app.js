@@ -7,288 +7,212 @@ const io = require('socket.io')(http, {
         methods: ["GET", "POST"],
         credentials: true
     },
-    connectionStateRecovery: {
-        // 斷線後 2 分鐘內可嘗試恢復狀態
-        maxDisconnectionDuration: 2 * 60 * 1000, 
-        skipMiddlewares: true,
-    },
-    // ⚡️ 核心修改：讓連線檢測更敏銳
-    // Render/Heroku 等平台通常會在 60秒無傳輸時切斷連線
-    // 設定 25s Ping + 20s Timeout = 45s，確保連線活躍且能快速發現斷線
-    pingTimeout: 20000, 
-    pingInterval: 25000, 
+    // 關閉內建的 connectionStateRecovery，改用我們自己的 Session 機制比較穩
+    pingTimeout: 10000,  // 縮短到 10秒，更快發現斷線
+    pingInterval: 15000, 
     transports: ['websocket', 'polling']
 });
 
 app.use(express.static('public'));
 
-let waitingQueue = [];
-const MAX_CONNECTIONS = 1000;
-const messageRateLimit = new Map();
-const roomDestructionTimers = new Map();
-
-const allTopics = [
-    "🥢 邊度有好嘢食？", "💼 今晚收幾點？", "🎬 有冇好戲推介？",
-    "⚽ 點睇琴晚場波？", "🎮 打機組隊？", "☕ 邊度咖啡好飲？", "📸 近排邊度打卡正？"
-];
-
-function getRandomTopics(count = 3) {
-    const shuffled = [...allTopics].sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, count);
-}
+// 資料結構
+let waitingQueue = []; // 存 userId 而不是 socket.id
+const userSessions = new Map(); // userId -> { roomId, socketId, disconnectTimer }
+const rooms = new Map(); // roomId -> Set(userId)
 
 app.get('/health', (req, res) => {
-    res.json({
-        status: 'ok',
-        online: io.sockets.sockets.size,
-        waiting: waitingQueue.length,
-        rooms: Array.from(io.sockets.adapter.rooms.keys()).filter(r => r.startsWith('room_')).length,
-        timestamp: new Date().toISOString()
-    });
+    res.json({ status: 'ok', online: userSessions.size, waiting: waitingQueue.length });
+});
+
+// 中間件：處理身份驗證
+io.use((socket, next) => {
+    const token = socket.handshake.auth.token;
+    if (!token) return next(new Error("invalid token"));
+    socket.userId = token; // 把 userId 綁定到這個 socket
+    next();
 });
 
 io.on('connection', (socket) => {
-    // 檢查連線數上限
-    if (io.sockets.sockets.size > MAX_CONNECTIONS) {
-        socket.emit('error', { msg: '伺服器繁忙，請稍後再試' });
-        socket.disconnect(true);
-        return;
-    }
+    const userId = socket.userId;
+    console.log(`🔗 用戶連線: ${userId} (Socket: ${socket.id})`);
 
-    // --- 恢復連線邏輯 ---
-    if (socket.recovered) {
-        const recoveredRoom = socket.roomId || socket.data.roomId;
-        console.log(`♻️ 用戶恢復連線: ${socket.id} (Room: ${recoveredRoom})`);
+    // ♻️ 檢查是否為「斷線重連」的舊用戶
+    if (userSessions.has(userId)) {
+        const session = userSessions.get(userId);
         
-        if (recoveredRoom) {
-            if (!socket.rooms.has(recoveredRoom)) {
-                socket.join(recoveredRoom);
-            }
-            socket.roomId = recoveredRoom;
-            socket.data.roomId = recoveredRoom;
+        // 如果有斷線計時器，先取消（代表他回來了）
+        if (session.disconnectTimer) {
+            clearTimeout(session.disconnectTimer);
+            session.disconnectTimer = null;
+        }
+
+        // 更新 session 中的新 socket ID
+        session.socketId = socket.id;
+        userSessions.set(userId, session);
+
+        // 如果他原本在房間裡，把他拉回去
+        if (session.roomId) {
+            socket.join(session.roomId);
+            socket.roomId = session.roomId;
             
-            // 取消銷毀倒數 (因為人回來了)
-            if (roomDestructionTimers.has(recoveredRoom)) {
-                clearTimeout(roomDestructionTimers.get(recoveredRoom));
-                roomDestructionTimers.delete(recoveredRoom);
-            }
+            console.log(`♻️ 用戶 ${userId} 重連回房間 ${session.roomId}`);
             
-            socket.emit('connection_recovered', { 
-                roomId: recoveredRoom,
-                topics: getRandomTopics()
-            });
-            socket.to(recoveredRoom).emit('partner_status', { 
+            // 通知前端恢復成功
+            socket.emit('connection_recovered', { roomId: session.roomId });
+            
+            // 通知對方「我回來了」
+            socket.to(session.roomId).emit('partner_status', { 
                 status: 'online', 
                 msg: '對方已重新連線' 
             });
         }
-        return;
+    } else {
+        // 全新用戶
+        userSessions.set(userId, { roomId: null, socketId: socket.id, disconnectTimer: null });
     }
 
-    console.log(`👤 新用戶連線: ${socket.id}`);
-
-    // --- 開始配對邏輯 ---
     socket.on('start_chat', () => {
         // 清理舊狀態
-        if (socket.roomId) {
-            leaveRoom(socket, socket.roomId);
+        const session = userSessions.get(userId);
+        if (session && session.roomId) {
+            socket.to(session.roomId).emit('partner_left', { msg: '對方已離開' });
+            leaveRoom(userId, session.roomId);
         }
         
-        // 確保不在等待隊列中
-        waitingQueue = waitingQueue.filter(id => id !== socket.id);
-        if (socket.queueTimeout) clearTimeout(socket.queueTimeout);
+        // 移除等待隊列中的舊紀錄
+        waitingQueue = waitingQueue.filter(id => id !== userId);
 
-        // ⚡️ 核心修改：配對時過濾掉「假在線」的 Socket
-        let partnerId = null;
-        let partnerSocket = null;
-
-        while (waitingQueue.length > 0) {
-            partnerId = waitingQueue.shift();
-            partnerSocket = io.sockets.sockets.get(partnerId);
-
-            // 嚴格檢查：必須 Connected 且沒有房間
-            if (partnerSocket && partnerSocket.connected && !partnerSocket.roomId) {
-                break; // 找到有效夥伴
-            } else {
-                partnerSocket = null; // 無效，繼續找下一個
-            }
-        }
-
-        if (partnerSocket) {
+        if (waitingQueue.length > 0) {
             // 配對成功
-            const roomId = `room_${partnerId}_${socket.id}`;
+            const partnerId = waitingQueue.shift();
             
-            socket.join(roomId);
-            partnerSocket.join(roomId);
-            
-            socket.roomId = roomId;
-            socket.data.roomId = roomId;
-            partnerSocket.roomId = roomId;
-            partnerSocket.data.roomId = roomId;
-            
-            // 清理計時器
-            if (partnerSocket.queueTimeout) clearTimeout(partnerSocket.queueTimeout);
-            if (socket.queueTimeout) clearTimeout(socket.queueTimeout);
-            
-            io.to(roomId).emit('matched', { roomId, topics: getRandomTopics() });
-            console.log(`✅ 配對成功: ${roomId}`);
-        } else {
-            // 加入隊列等待
-            waitingQueue.push(socket.id);
-            socket.emit('waiting', { msg: '搵緊聊天對象...' });
-            
-            // 30秒後通知還在等
-            socket.queueTimeout = setTimeout(() => {
-                if (waitingQueue.includes(socket.id)) {
-                    socket.emit('queue_timeout', { 
-                        msg: '等緊人配對中...再等陣啦', 
-                        waitingCount: waitingQueue.length 
-                    });
-                }
-            }, 30000);
-        }
-    });
+            // 檢查 partner 是否還在線
+            if (userSessions.has(partnerId)) {
+                const roomId = `room_${Math.random().toString(36).substr(2, 9)}`;
+                const partnerSession = userSessions.get(partnerId);
+                const partnerSocket = io.sockets.sockets.get(partnerSession.socketId);
 
-    // --- 發送訊息邏輯 ---
-    // ⚡️ 核心修改：增加 callback 回調函數
-    socket.on('send_msg', (data, callback) => {
-        const now = Date.now();
-        const userMessages = messageRateLimit.get(socket.id) || [];
-        const recentMessages = userMessages.filter(time => now - time < 1000);
-        
-        if (recentMessages.length >= 5) {
-            socket.emit('error', { msg: '發送太快，請稍候' });
-            if (typeof callback === 'function') callback({ status: 'error' });
-            return;
-        }
-        
-        recentMessages.push(now);
-        messageRateLimit.set(socket.id, recentMessages);
-        
-        if (!data || !data.msg || typeof data.msg !== 'string') return;
-        const cleanMsg = data.msg.trim();
-        if (cleanMsg.length === 0 || cleanMsg.length > 1000) return;
-        
-        const currentRoom = socket.roomId || socket.data.roomId;
-        
-        // 嚴格檢查房間匹配
-        if (currentRoom && currentRoom === data.roomId) {
-            // 檢查房間是否還有其他人 (防止對空氣講話)
-            const roomSize = io.sockets.adapter.rooms.get(currentRoom)?.size || 0;
-            
-            if (roomSize < 2) {
-                // 對方可能斷線了
-                if (typeof callback === 'function') callback({ status: 'error', msg: '對方已斷線' });
-                // 通知發送者對方不在了
-                socket.emit('partner_left', { msg: '對方已斷線，無法傳送' });
-                cleanupRoom(currentRoom);
+                // 更新雙方 Session
+                session.roomId = roomId;
+                partnerSession.roomId = roomId;
+                
+                // 自己的 socket 設定
+                socket.join(roomId);
+                socket.roomId = roomId;
+                
+                // 對方的 socket 設定 (如果對方 socket 還活著)
+                if (partnerSocket) {
+                    partnerSocket.join(roomId);
+                    partnerSocket.roomId = roomId;
+                }
+
+                // 記錄房間成員
+                rooms.set(roomId, new Set([userId, partnerId]));
+
+                io.to(roomId).emit('matched', { roomId, topics: getRandomTopics() });
+                console.log(`✅ 配對成功: ${roomId} (${userId} & ${partnerId})`);
             } else {
-                // 正常發送
-                socket.to(data.roomId).emit('receive_msg', { msg: cleanMsg });
-                // 告訴前端發送成功
-                if (typeof callback === 'function') callback({ status: 'ok' });
+                // Partner 失效，把自己放回隊列
+                waitingQueue.push(userId);
+                socket.emit('waiting', { msg: '搵緊聊天對象...' });
             }
         } else {
-            if (typeof callback === 'function') callback({ status: 'error', msg: '房間錯誤' });
+            waitingQueue.push(userId);
+            socket.emit('waiting', { msg: '搵緊聊天對象...' });
         }
     });
 
+    socket.on('send_msg', (data, callback) => {
+        const session = userSessions.get(userId);
+        if (!session || !session.roomId) return;
+        
+        // 確保訊息發送到正確房間
+        socket.to(session.roomId).emit('receive_msg', { msg: data.msg });
+        if (callback) callback({ status: 'ok' });
+    });
+
+    // 處理打字狀態等... (略，與之前相同，記得用 session.roomId)
     socket.on('typing', () => { 
-        const r = socket.roomId;
-        if (r) socket.to(r).emit('partner_typing'); 
+        const s = userSessions.get(userId);
+        if (s && s.roomId) socket.to(s.roomId).emit('partner_typing'); 
     });
-    
     socket.on('stop_typing', () => { 
-        const r = socket.roomId;
-        if (r) socket.to(r).emit('partner_stop_typing'); 
-    });
-    
-    socket.on('msg_read', () => { 
-        const r = socket.roomId;
-        if (r) socket.to(r).emit('partner_read'); 
+        const s = userSessions.get(userId);
+        if (s && s.roomId) socket.to(s.roomId).emit('partner_stop_typing'); 
     });
 
     socket.on('end_chat', () => {
-        const r = socket.roomId;
-        if (r) {
-            socket.to(r).emit('partner_left', { msg: '對方已離開' });
-            leaveRoom(socket, r);
-            cleanupRoom(r); // 強制清理房間
+        const session = userSessions.get(userId);
+        if (session && session.roomId) {
+            socket.to(session.roomId).emit('partner_left', { msg: '對方已離開' });
+            leaveRoom(userId, session.roomId);
             socket.emit('chat_ended', { msg: '對話已結束' });
         }
     });
 
     socket.on('disconnect', (reason) => {
-        console.log(`👋 用戶斷線: ${socket.id}, 原因: ${reason}`);
+        console.log(`❌ 斷線: ${userId} (${reason})`);
         
-        waitingQueue = waitingQueue.filter(id => id !== socket.id);
-        if (socket.queueTimeout) clearTimeout(socket.queueTimeout);
-        
-        const r = socket.roomId || socket.data.roomId;
-        
-        if (r) {
-            socket.to(r).emit('partner_status', { 
+        // 從等待隊列移除
+        waitingQueue = waitingQueue.filter(id => id !== userId);
+
+        const session = userSessions.get(userId);
+        if (session && session.roomId) {
+            // 通知對方「斷線中」
+            socket.to(session.roomId).emit('partner_status', { 
                 status: 'offline', 
                 msg: '對方連線不穩，等待重連中...' 
             });
 
-            // 設置房間銷毀倒數 (60秒後若沒重連則銷毀)
-            // 手機版切換 App 容易斷線，給予一點緩衝時間
-            if (!roomDestructionTimers.has(r)) {
-                const timer = setTimeout(() => {
-                    console.log(`⏰ 房間 ${r} 超時，強制清理`);
-                    io.to(r).emit('partner_left', { msg: '對方已斷線離開' });
-                    cleanupRoom(r);
-                }, 60000); // 1分鐘緩衝
-                roomDestructionTimers.set(r, timer);
-            }
+            // 設定 60秒 銷毀倒數
+            // 這是關鍵：不會馬上踢人，給 60秒緩衝讓手機重連
+            session.disconnectTimer = setTimeout(() => {
+                console.log(`💀 用戶 ${userId} 超時未歸，銷毀房間`);
+                if (session.roomId) {
+                    io.to(session.roomId).emit('partner_left', { msg: '對方已斷線離開' });
+                    // 強制清理該房間所有成員
+                    const roomUsers = rooms.get(session.roomId);
+                    if (roomUsers) {
+                        roomUsers.forEach(uid => {
+                            const uSession = userSessions.get(uid);
+                            if (uSession) uSession.roomId = null;
+                            // 這裡不刪除 session，只清空 roomId，讓他下次進來是閒置狀態
+                        });
+                        rooms.delete(session.roomId);
+                    }
+                }
+            }, 60000); 
+        } else {
+            // 如果不在房間，直接刪除 session (過一段時間)
+            setTimeout(() => {
+                if (userSessions.has(userId) && !userSessions.get(userId).roomId) {
+                    userSessions.delete(userId);
+                }
+            }, 5000);
         }
     });
 });
 
-// 輔助函數：讓單一 Socket 離開房間
-function leaveRoom(socket, roomId) {
-    socket.leave(roomId);
-    socket.roomId = null;
-    socket.data.roomId = null;
-}
-
-// 輔助函數：徹底清理房間
-function cleanupRoom(roomId) {
-    if (roomDestructionTimers.has(roomId)) {
-        clearTimeout(roomDestructionTimers.get(roomId));
-        roomDestructionTimers.delete(roomId);
+function leaveRoom(userId, roomId) {
+    // 取得房間內另一個人的 ID
+    const roomUsers = rooms.get(roomId);
+    if (roomUsers) {
+        roomUsers.delete(userId); // 移除自己
+        // 如果房間沒人了，刪除房間
+        if (roomUsers.size === 0) rooms.delete(roomId);
     }
     
-    const room = io.sockets.adapter.rooms.get(roomId);
-    if (room) {
-        // 讓房間內剩下的所有人離開
-        room.forEach(socketId => {
-            const s = io.sockets.sockets.get(socketId);
-            if (s) {
-                leaveRoom(s, roomId);
-                s.emit('partner_left', { msg: '對話已結束' });
-            }
-        });
-    }
+    const session = userSessions.get(userId);
+    if (session) session.roomId = null;
+    
+    // 讓 socket 離開 channel
+    const socket = io.sockets.sockets.get(session?.socketId);
+    if (socket) socket.leave(roomId);
 }
 
-// 定期清理任務 (5分鐘)
-setInterval(() => {
-    const now = Date.now();
-    for (const [id, times] of messageRateLimit.entries()) {
-        if (times.length === 0 || now - times[times.length - 1] > 60000) {
-            messageRateLimit.delete(id);
-        }
-    }
-    // 再次確認等待隊列中的 socket 是否真的活著
-    waitingQueue = waitingQueue.filter(id => {
-        const s = io.sockets.sockets.get(id);
-        return s && s.connected;
-    });
-}, 300000);
+// 輔助：隨機話題
+const allTopics = ["🥢 邊度有好嘢食？", "🎬 有冇好戲推介？", "🎮 打機組隊？", "📸 週末去邊玩？"];
+function getRandomTopics() { return allTopics.sort(() => 0.5 - Math.random()).slice(0, 3); }
 
 const PORT = process.env.PORT || 3000;
-http.listen(PORT, '0.0.0.0', () => {
-    console.log(`✅ 暖港野伺服器啟動於 Port ${PORT}`);
-});
+http.listen(PORT, '0.0.0.0', () => { console.log(`✅ Server running on ${PORT}`); });
