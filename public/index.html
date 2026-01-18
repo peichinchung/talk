@@ -42,7 +42,6 @@
 
         #chat-box { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 8px; scroll-behavior: smooth; }
         
-        /* 訊息樣式 */
         .msg-wrapper { display: flex; flex-direction: column; max-width: 75%; position: relative; }
         .msg-wrapper.me { align-self: flex-end; align-items: flex-end; }
         .msg-wrapper.partner { align-self: flex-start; }
@@ -51,11 +50,9 @@
         .msg.me { background: var(--my-msg); border-bottom-right-radius: 4px; }
         .msg.partner { background: var(--partner-msg); border-bottom-left-radius: 4px; }
 
-        /* ✨ 已讀狀態 (CSS) */
         .read-status { font-size: 10px; color: rgba(255,255,255,0.6); margin-top: 2px; margin-right: 4px; height: 14px; opacity: 0; transition: opacity 0.3s; }
         .read-status.active { opacity: 1; }
 
-        /* ✨ 打字氣泡動畫 (在對話框內) */
         .typing-bubble {
             align-self: flex-start; background: var(--partner-msg); padding: 10px 16px;
             border-radius: 20px; border-bottom-left-radius: 4px; width: fit-content;
@@ -65,7 +62,6 @@
         .dot:nth-child(1) { animation-delay: -0.32s; } .dot:nth-child(2) { animation-delay: -0.16s; }
         @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
 
-        /* ✨ 重新配對按鈕樣式 */
         .rematch-container { text-align: center; margin: 30px 0; opacity: 0; animation: fadeIn 0.5s forwards; }
         .rematch-btn {
             background: var(--accent-color); color: white; border: none; padding: 12px 28px;
@@ -149,7 +145,17 @@
             { type: "急口令", text: "郵差叔叔，送信純熟，迅速送出。" },
             { type: "爛gag", text: "大明養小明，咁邊個養大明？<br>... 狗（因為「久」仰大明）" },
             { type: "爛gag", text: "點解小明跑得快過火車？<br>... 因為小明喺火車入面跑。" },
+            { type: "急口令", text: "一蚊一隻龜，七蚊一隻雞，你話龜貴定雞貴？" },
+            { type: "急口令", text: "痴線蜘蛛啲蜘蛛絲，黐住枝樹枝。" },
+            { type: "爛gag", text: "咩豬係得1隻腳？<br>... 珍寶「珠」" },
+            { type: "爛gag", text: "咩粥最鹹濕？<br>... 及第粥（因為「𥄫底」粥）" },
+            { type: "爛gag", text: "咩生果最容易種？<br>... 蕉（因為「中招」）" },
+            { type: "爛gag", text: "隆胸兩邊隆曬要一萬，但隆一邊只要三千，估一四字成語～<br>... 一「波」三折。" },
+            { type: "爛gag", text: "咩動物最鐘意聞底褲？<br>... 豹（因為豹「紋」底褲）" },
             { type: "冷知識", text: "原來廣東話有 9 個聲調，你試下數：『詩史試時市事兒似寺』" },
+            { type: "投稿", text: "想你嘅爛 Gag 出現喺度？<br>去 IG @hatalk_canton 投稿啦！" },
+            { type: "投稿", text: "尋日最正對話截圖已上傳 Threads，去 bio 睇啦！" },
+            { type: "提醒", text: "匿名聊天雖然好玩，但記得都要尊重對方喔 ❤️" },
             { type: "小貼士", text: "萬一唔知傾咩好，可以用我哋提供嘅『話題建議』掣！" }
         ];
 
@@ -163,6 +169,8 @@
             auth: { token: myUserId },
             reconnection: true,
             reconnectionDelay: 1000,
+            reconnectionDelayMax: 5000,
+            reconnectionAttempts: Infinity,
             timeout: 10000,
         });
 
@@ -211,7 +219,6 @@
         function startSearch() {
             if (waitTimer) clearInterval(waitTimer);
             
-            // 清除之前的按鈕和內容
             chatBox.innerHTML = '';
             
             socket.emit('start_chat');
@@ -248,7 +255,7 @@
                     mainBtn.disabled = false;
                     addSystemMsg('⚠️ 網絡不穩，傳送超時');
                 }
-            }, 3000);
+            }, 5000);
 
             socket.emit('send_msg', { msg: text }, (response) => {
                 clearTimeout(fallbackTimer);
@@ -274,7 +281,6 @@
             }
         }
 
-        // ✨ 顯示重新配對按鈕
         function showRematchButton() {
             const div = document.createElement('div');
             div.className = 'rematch-container';
@@ -285,7 +291,7 @@
 
         // Socket 事件
         socket.on('connect', () => {
-            console.log('Connected');
+            console.log('✅ Connected');
             statusBar.style.display = 'none';
             if (socket.autoStart) {
                 delete socket.autoStart;
@@ -297,6 +303,7 @@
         });
 
         socket.on('disconnect', () => {
+            console.log('❌ Disconnected');
             if (waitTimer) clearInterval(waitTimer);
             statusBar.style.display = 'block';
             msgInput.disabled = true;
@@ -315,18 +322,17 @@
             mainBtn.innerText = '傳送';
             mainBtn.disabled = false;
             endBtn.style.display = 'block';
+            typingTextStatus.innerText = '';
             requestWakeLock();
         });
 
         socket.on('receive_msg', (data) => {
-            // ✨ 收到訊息時隱藏打字氣泡
             typingBubble.style.display = 'none';
             addMsg(data.msg, 'partner');
-            socket.emit('msg_read'); // 告訴對方已讀
+            socket.emit('msg_read');
         });
 
         socket.on('partner_read', () => {
-            // ✨ 標記自己最後一條訊息為已讀
             const myMsgs = document.querySelectorAll('.msg-wrapper.me .read-status');
             if (myMsgs.length > 0) {
                 myMsgs[myMsgs.length - 1].classList.add('active');
@@ -335,7 +341,6 @@
         });
 
         socket.on('partner_typing', () => {
-            // ✨ 顯示打字氣泡，並滾動到底部
             typingBubble.style.display = 'flex';
             chatBox.appendChild(typingBubble); 
             chatBox.scrollTop = chatBox.scrollHeight;
@@ -346,6 +351,7 @@
         });
 
         socket.on('connection_recovered', (data) => {
+            console.log('🔄 重連成功:', data);
             currentRoom = data.roomId;
             statusBar.style.display = 'none';
             msgInput.disabled = false;
@@ -353,25 +359,39 @@
             mainBtn.disabled = false;
             endBtn.style.display = 'block';
             addSystemMsg('✅ 網絡已恢復');
+            typingTextStatus.innerText = '';
+        });
+
+        socket.on('room_closed', (data) => {
+            console.log('🚪 房間已關閉:', data);
+            addSystemMsg(data.msg);
+            resetToIdle();
+            showRematchButton();
         });
 
         socket.on('partner_status', (data) => {
-            // ✨ 顯示「對方暫時跳出」等狀態文字
             typingTextStatus.innerText = data.msg;
+            if (data.status === 'online') {
+                setTimeout(() => { typingTextStatus.innerText = ''; }, 3000);
+            }
         });
 
         socket.on('partner_left', (data) => {
             if (waitTimer) clearInterval(waitTimer);
             addSystemMsg(data.msg);
             resetToIdle();
-            showRematchButton(); // ✨ 顯示重新配對按鈕
+            showRematchButton();
         });
 
         socket.on('chat_ended', (data) => {
             if (waitTimer) clearInterval(waitTimer);
             addSystemMsg(data.msg);
             resetToIdle();
-            showRematchButton(); // ✨ 顯示重新配對按鈕
+            showRematchButton();
+        });
+
+        socket.on('waiting', (data) => {
+            console.log('⏳ 等待中...');
         });
 
         function resetToIdle() {
@@ -390,10 +410,9 @@
         function addMsg(text, type) {
             const div = document.createElement('div');
             div.className = `msg-wrapper ${type}`;
-            // 只有自己的訊息才加已讀標籤
             const readTag = type === 'me' ? '<div class="read-status"></div>' : '';
             div.innerHTML = `<div class="msg ${type}">${text.replace(/</g, '&lt;')}</div>${readTag}`;
-            chatBox.insertBefore(div, typingBubble); // 插入在打字氣泡之前
+            chatBox.insertBefore(div, typingBubble);
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 

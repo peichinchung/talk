@@ -7,8 +7,6 @@ const io = require('socket.io')(http, {
         methods: ["GET", "POST"],
         credentials: true
     },
-    // ⚡️ 關鍵設定：快速偵測斷線
-    // pingTimeout 10秒：如果10秒內沒收到回應，視為斷線 (解決殭屍連線)
     pingTimeout: 10000, 
     pingInterval: 15000, 
     transports: ['websocket', 'polling']
@@ -17,9 +15,14 @@ const io = require('socket.io')(http, {
 app.use(express.static('public'));
 
 // --- 資料結構 ---
-let waitingQueue = []; // 存 userId 而不是 socket.id
-const userSessions = new Map(); // userId -> { roomId, socketId, disconnectTimer }
+let waitingQueue = [];
+const userSessions = new Map(); // userId -> { roomId, socketId, disconnectTimer, softDisconnectTimer }
 const rooms = new Map(); // roomId -> Set(userId)
+
+// --- 配置參數 ---
+const DISCONNECT_GRACE_PERIOD = 5 * 60 * 1000; // 5分鐘
+const SOFT_DISCONNECT_DELAY = 10 * 1000; // 10秒
+const IDLE_SESSION_CLEANUP = 30 * 1000; // 30秒
 
 const allTopics = [
     "🥢 邊度有好嘢食？", "🎬 有冇好戲推介？", "🎮 打機組隊？", 
@@ -34,9 +37,27 @@ function getRandomTopics() {
 io.use((socket, next) => {
     const token = socket.handshake.auth.token;
     if (!token) return next(new Error("Authentication error"));
-    socket.userId = token; // 將 Socket 綁定到特定的 UserID
+    socket.userId = token;
     next();
 });
+
+// --- 定期清理等待隊列 ---
+setInterval(() => {
+    const before = waitingQueue.length;
+    
+    waitingQueue = waitingQueue.filter(id => {
+        const session = userSessions.get(id);
+        if (!session) return false;
+        
+        const socket = io.sockets.sockets.get(session.socketId);
+        return socket && socket.connected && !session.roomId;
+    });
+    
+    const after = waitingQueue.length;
+    if (before !== after) {
+        console.log(`🧹 清理等待隊列: ${before} → ${after}`);
+    }
+}, 30000);
 
 io.on('connection', (socket) => {
     const userId = socket.userId;
@@ -49,89 +70,178 @@ io.on('connection', (socket) => {
         // 更新新的 Socket ID
         session.socketId = socket.id;
         
-        // 如果有斷線銷毀倒數，先取消 (代表他在時間內回來了)
+        // 清理所有待執行的 timer
         if (session.disconnectTimer) {
             clearTimeout(session.disconnectTimer);
             session.disconnectTimer = null;
-            console.log(`✨ 用戶 ${userId} 在銷毀前重連成功！`);
         }
+        if (session.softDisconnectTimer) {
+            clearTimeout(session.softDisconnectTimer);
+            session.softDisconnectTimer = null;
+        }
+        
+        console.log(`✨ 用戶 ${userId} 重連成功`);
 
-        // 如果他原本在房間裡，強制把他拉回去
+        // 如果在房間內
         if (session.roomId) {
-            socket.join(session.roomId);
-            socket.roomId = session.roomId; // 方便後續存取
+            const roomUsers = rooms.get(session.roomId);
             
-            // 通知前端：你已回到房間
-            socket.emit('connection_recovered', { roomId: session.roomId });
-            
-            // 通知對方：我回來了
-            socket.to(session.roomId).emit('partner_status', { 
-                status: 'online', 
-                msg: '對方已重新連線 ✅' 
-            });
+            if (roomUsers && roomUsers.has(userId)) {
+                // 房間還在，重新加入
+                socket.join(session.roomId);
+                socket.roomId = session.roomId;
+                
+                socket.emit('connection_recovered', { 
+                    roomId: session.roomId,
+                    msg: '已重新連線到對話 ✅' 
+                });
+                
+                // 檢查對方是否在線
+                const partner = Array.from(roomUsers).find(id => id !== userId);
+                if (partner) {
+                    const partnerSession = userSessions.get(partner);
+                    const partnerSocket = io.sockets.sockets.get(partnerSession?.socketId);
+                    
+                    if (partnerSocket?.connected) {
+                        socket.to(session.roomId).emit('partner_status', { 
+                            status: 'online', 
+                            msg: '對方已重新連線 ✅' 
+                        });
+                    } else {
+                        socket.emit('partner_status', { 
+                            status: 'reconnecting', 
+                            msg: '對方連線中斷，等待重連... ⏳' 
+                        });
+                    }
+                }
+            } else {
+                // 房間已不存在
+                session.roomId = null;
+                socket.emit('room_closed', { 
+                    msg: '對方已離開，房間已關閉' 
+                });
+            }
         }
-        userSessions.set(userId, session); // 更新 Map
+        
+        userSessions.set(userId, session);
     } else {
         // 新用戶初始化
-        userSessions.set(userId, { roomId: null, socketId: socket.id, disconnectTimer: null });
+        userSessions.set(userId, { 
+            roomId: null, 
+            socketId: socket.id, 
+            disconnectTimer: null,
+            softDisconnectTimer: null 
+        });
     }
 
-    // --- 配對邏輯 ---
+    // --- 配對邏輯 (完整加強版) ---
     socket.on('start_chat', () => {
         const session = userSessions.get(userId);
         
+        if (!session) {
+            socket.emit('error', { msg: '會話無效，請重新整理' });
+            return;
+        }
+
         // 如果已經在房間，先離開
-        if (session && session.roomId) {
-            socket.to(session.roomId).emit('partner_left', { msg: '對方已離開' });
+        if (session.roomId) {
+            socket.to(session.roomId).emit('partner_left', { 
+                msg: '對方已離開尋找新對象' 
+            });
             leaveRoom(userId, session.roomId);
         }
 
-        // 清理自己在等待隊列的舊紀錄
+        // 清理自己在等待隊列的所有舊紀錄
         waitingQueue = waitingQueue.filter(id => id !== userId);
 
-        if (waitingQueue.length > 0) {
-            // 找到對象
-            let partnerId = waitingQueue.shift();
+        // 嘗試配對
+        let partnerId = null;
+        let attempts = 0;
+        const maxAttempts = waitingQueue.length;
+
+        while (attempts < maxAttempts && waitingQueue.length > 0) {
+            const candidateId = waitingQueue.shift();
+            attempts++;
+
+            // 不能配對到自己
+            if (candidateId === userId) {
+                console.warn(`⚠️ 隊列中發現自己 ${userId}，跳過`);
+                continue;
+            }
+
+            const candidateSession = userSessions.get(candidateId);
             
-            // 再次確認 partner 是否有效 (防止配對到剛斷線的人)
-            while (!userSessions.has(partnerId) && waitingQueue.length > 0) {
-                 partnerId = waitingQueue.shift();
+            // 檢查 session 是否存在
+            if (!candidateSession) {
+                console.warn(`⚠️ ${candidateId} session 不存在，跳過`);
+                continue;
             }
 
-            if (userSessions.has(partnerId)) {
-                const partnerSession = userSessions.get(partnerId);
-                const roomId = `room_${Math.random().toString(36).substr(2, 9)}`;
-                
-                // 設定雙方狀態
-                session.roomId = roomId;
-                partnerSession.roomId = roomId;
-                
-                // Socket Join
-                socket.join(roomId);
-                socket.roomId = roomId;
-
-                const partnerSocket = io.sockets.sockets.get(partnerSession.socketId);
-                if (partnerSocket) {
-                    partnerSocket.join(roomId);
-                    partnerSocket.roomId = roomId;
-                }
-
-                rooms.set(roomId, new Set([userId, partnerId]));
-                
-                io.to(roomId).emit('matched', { roomId, topics: getRandomTopics() });
-                console.log(`✅ 配對成功: ${roomId}`);
-            } else {
-                // 如果佇列沒人有效，把自己放進去
-                waitingQueue.push(userId);
-                socket.emit('waiting', { msg: '搵緊聊天對象...' });
+            // 檢查是否已在其他房間
+            if (candidateSession.roomId) {
+                console.warn(`⚠️ ${candidateId} 已在房間，跳過`);
+                continue;
             }
+
+            // 檢查 socket 是否真的連線
+            const candidateSocket = io.sockets.sockets.get(candidateSession.socketId);
+            if (!candidateSocket || !candidateSocket.connected) {
+                console.warn(`⚠️ ${candidateId} socket 未連線，跳過`);
+                continue;
+            }
+
+            // ✅ 找到有效的配對對象
+            partnerId = candidateId;
+            break;
+        }
+
+        // 執行配對或進入等待
+        if (partnerId) {
+            const partnerSession = userSessions.get(partnerId);
+            const partnerSocket = io.sockets.sockets.get(partnerSession.socketId);
+            
+            // 生成房間 ID
+            const roomId = `room_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            
+            // 先設定狀態（防止 race condition）
+            session.roomId = roomId;
+            partnerSession.roomId = roomId;
+            
+            // 雙方加入房間
+            socket.join(roomId);
+            socket.roomId = roomId;
+            
+            partnerSocket.join(roomId);
+            partnerSocket.roomId = roomId;
+            
+            // 記錄房間成員
+            rooms.set(roomId, new Set([userId, partnerId]));
+            
+            // 發送配對成功訊息
+            const topics = getRandomTopics();
+            io.to(roomId).emit('matched', { 
+                roomId, 
+                topics,
+                msg: '配對成功！開始聊天吧 🎉' 
+            });
+            
+            console.log(`✅ 配對成功: ${userId} ↔ ${partnerId} (房間: ${roomId})`);
+            
         } else {
-            waitingQueue.push(userId);
-            socket.emit('waiting', { msg: '搵緊聊天對象...' });
+            // 沒找到人，進入等待隊列
+            if (!waitingQueue.includes(userId)) {
+                waitingQueue.push(userId);
+                console.log(`⏳ ${userId} 進入等待隊列 (目前: ${waitingQueue.length} 人)`);
+            }
+            
+            socket.emit('waiting', { 
+                msg: '搵緊聊天對象...',
+                queuePosition: waitingQueue.length 
+            });
         }
     });
 
-    // --- 發送訊息 (含 Ack 回調) ---
+    // --- 發送訊息 ---
     socket.on('send_msg', (data, callback) => {
         const session = userSessions.get(userId);
         
@@ -140,39 +250,53 @@ io.on('connection', (socket) => {
             return;
         }
 
-        // 檢查房間是否只剩自己 (防止對方已斷線但還沒銷毀)
-        const roomUsers = rooms.get(session.roomId);
-        if (!roomUsers || roomUsers.size < 2) {
-             // 這裡可以選擇是否允許發送，或者提示對方斷線
-             // 為了體驗，我們還是允許發送，但可以標記
-        }
-
         socket.to(session.roomId).emit('receive_msg', { msg: data.msg });
         
-        // 告訴前端發送成功
         if (callback) callback({ status: 'ok' });
+    });
+
+    // --- 已讀回報 ---
+    socket.on('msg_read', () => {
+        const session = userSessions.get(userId);
+        if (session?.roomId) {
+            socket.to(session.roomId).emit('partner_read');
+        }
     });
 
     socket.on('typing', () => {
         const s = userSessions.get(userId);
-        if (s && s.roomId) socket.to(s.roomId).emit('partner_typing');
+        if (s?.roomId) socket.to(s.roomId).emit('partner_typing');
     });
 
     socket.on('stop_typing', () => {
         const s = userSessions.get(userId);
-        if (s && s.roomId) socket.to(s.roomId).emit('partner_stop_typing');
+        if (s?.roomId) socket.to(s.roomId).emit('partner_stop_typing');
     });
 
+    // --- 主動離開 ---
     socket.on('end_chat', () => {
-        const s = userSessions.get(userId);
-        if (s && s.roomId) {
-            socket.to(s.roomId).emit('partner_left', { msg: '對方已離開' });
-            leaveRoom(userId, s.roomId);
-            socket.emit('chat_ended', { msg: '對話已結束' });
+        const session = userSessions.get(userId);
+        if (!session?.roomId) return;
+        
+        // 清理所有 timer
+        if (session.disconnectTimer) {
+            clearTimeout(session.disconnectTimer);
+            session.disconnectTimer = null;
         }
+        if (session.softDisconnectTimer) {
+            clearTimeout(session.softDisconnectTimer);
+            session.softDisconnectTimer = null;
+        }
+        
+        socket.to(session.roomId).emit('partner_left', { 
+            msg: '對方已主動離開' 
+        });
+        
+        leaveRoom(userId, session.roomId);
+        socket.emit('chat_ended', { msg: '對話已結束' });
     });
 
-    // --- 斷線處理 (最關鍵的部分) ---
+    // --- 斷線處理 (最關鍵) ---
     socket.on('disconnect', (reason) => {
         console.log(`❌ 斷線: ${userId} (${reason})`);
         
@@ -180,41 +304,52 @@ io.on('connection', (socket) => {
         waitingQueue = waitingQueue.filter(id => id !== userId);
 
         const session = userSessions.get(userId);
-        if (session && session.roomId) {
-            // 1. 先通知對方「連線不穩」
-            socket.to(session.roomId).emit('partner_status', { 
-                status: 'offline', 
-                msg: '對方連線不穩，等待重連中... ⏳' 
-            });
+        
+        // 清理舊的 timer
+        if (session?.disconnectTimer) {
+            clearTimeout(session.disconnectTimer);
+            session.disconnectTimer = null;
+        }
+        if (session?.softDisconnectTimer) {
+            clearTimeout(session.softDisconnectTimer);
+            session.softDisconnectTimer = null;
+        }
 
-            // 2. 設定 60秒 倒數
-            session.disconnectTimer = setTimeout(() => {
-                console.log(`💀 用戶 ${userId} 超時未歸，銷毀房間`);
-                
-                // 再次檢查是否真的還沒回來 (防止 race condition)
+        if (session?.roomId) {
+            // 先不通知，給 10 秒緩衝
+            session.softDisconnectTimer = setTimeout(() => {
                 const currentSession = userSessions.get(userId);
-                if (currentSession && currentSession.roomId) {
-                    io.to(currentSession.roomId).emit('partner_left', { msg: '對方已斷線離開' });
+                const currentSocket = io.sockets.sockets.get(currentSession?.socketId);
+                
+                if (currentSession?.roomId && !currentSocket?.connected) {
+                    io.to(currentSession.roomId).emit('partner_status', { 
+                        status: 'reconnecting', 
+                        msg: '對方連線不穩，等待重連中... ⏳' 
+                    });
+                }
+            }, SOFT_DISCONNECT_DELAY);
+
+            // 設定 5 分鐘寬限期
+            session.disconnectTimer = setTimeout(() => {
+                console.log(`💀 用戶 ${userId} 超時未歸，視為離開`);
+                
+                const currentSession = userSessions.get(userId);
+                if (currentSession?.roomId) {
+                    io.to(currentSession.roomId).emit('partner_left', { 
+                        msg: '對方已離開（逾時未重連）' 
+                    });
                     
-                    // 強制拆房
-                    const rId = currentSession.roomId;
-                    const users = rooms.get(rId);
-                    if (users) {
-                        users.forEach(u => {
-                            const uS = userSessions.get(u);
-                            if (uS) uS.roomId = null;
-                        });
-                        rooms.delete(rId);
-                    }
+                    leaveRoom(userId, currentSession.roomId);
                 }
-            }, 60000); // 60秒寬限期
+                
+                userSessions.delete(userId);
+            }, DISCONNECT_GRACE_PERIOD);
+            
         } else {
-            // 如果不在房間，5秒後清理 Session
-            setTimeout(() => {
-                if (userSessions.has(userId) && !userSessions.get(userId).roomId) {
-                    userSessions.delete(userId);
-                }
-            }, 5000);
+            // 不在房間，30秒後清理
+            session.disconnectTimer = setTimeout(() => {
+                userSessions.delete(userId);
+            }, IDLE_SESSION_CLEANUP);
         }
     });
 });
@@ -223,13 +358,25 @@ function leaveRoom(userId, roomId) {
     const roomUsers = rooms.get(roomId);
     if (roomUsers) {
         roomUsers.delete(userId);
-        if (roomUsers.size === 0) rooms.delete(roomId);
+        
+        // 如果房間只剩一人，也清理他的狀態
+        if (roomUsers.size === 1) {
+            const remainingUser = Array.from(roomUsers)[0];
+            const remainingSession = userSessions.get(remainingUser);
+            if (remainingSession) {
+                remainingSession.roomId = null;
+            }
+        }
+        
+        if (roomUsers.size === 0) {
+            rooms.delete(roomId);
+        }
     }
     
     const session = userSessions.get(userId);
     if (session) {
-        const socket = io.sockets.sockets.get(session.socketId);
-        if (socket) socket.leave(roomId);
+        const sock = io.sockets.sockets.get(session.socketId);
+        if (sock) sock.leave(roomId);
         session.roomId = null;
     }
 }
